@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>MoneyTrack - Login</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-variant": "#e1e3e2",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "surface-tint": "#3c6658",
+                        "surface-container-low": "#f2f4f3",
+                        "surface-container": "#eceeed",
+                        "surface-container-highest": "#e1e3e2",
+                        "outline": "#717974",
+                        "secondary-fixed": "#8bfa9b",
+                        "primary-container": "#0d3b2e",
+                        "on-tertiary-fixed-variant": "#92001c",
+                        "inverse-surface": "#2e3131",
+                        "secondary-container": "#88f798",
+                        "on-secondary-fixed-variant": "#00531f",
+                        "on-tertiary-container": "#ff6d70",
+                        "on-surface": "#191c1c",
+                        "error-container": "#ffdad6",
+                        "primary-fixed-dim": "#a3d0be",
+                        "primary": "#00241a",
+                        "on-background": "#191c1c",
+                        "surface-container-high": "#e6e9e8",
+                        "on-secondary-fixed": "#002108",
+                        "on-primary-fixed-variant": "#234e40",
+                        "inverse-on-surface": "#eff1f0",
+                        "surface-bright": "#f8faf9",
+                        "secondary-fixed-dim": "#6fdd81",
+                        "surface": "#f8faf9",
+                        "error": "#ba1a1a",
+                        "surface-container-lowest": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb3b1",
+                        "primary-fixed": "#beedd9",
+                        "tertiary-fixed": "#ffdad8",
+                        "on-primary-fixed": "#002117",
+                        "on-tertiary-fixed": "#410007",
+                        "surface-dim": "#d8dada",
+                        "on-error": "#ffffff",
+                        "background": "#f8faf9",
+                        "on-tertiary": "#ffffff",
+                        "inverse-primary": "#a3d0be",
+                        "outline-variant": "#c0c8c3",
+                        "on-primary": "#ffffff",
+                        "on-primary-container": "#79a694",
+                        "tertiary-container": "#6f0013",
+                        "on-surface-variant": "#414845",
+                        "secondary": "#006e2c",
+                        "tertiary": "#470008",
+                        "on-secondary-container": "#00722e"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "sm": "8px",
+                        "base": "4px",
+                        "lg": "24px",
+                        "container-margin": "20px",
+                        "card-gap": "12px",
+                        "xs": "4px",
+                        "xl": "32px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "label-caps": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-muted": ["Inter"],
+                        "display-currency": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-muted": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "display-currency": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        /* Focus ring animation for input */
+        .input-ring:focus-within {
+            box-shadow: 0 0 0 2px var(--tw-colors-primary-container);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased min-h-screen flex items-center justify-center p-container-margin relative overflow-hidden">
+<!-- Decorative background elements -->
+<div class="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-primary-fixed opacity-30 blur-[80px] -z-10"></div>
+<div class="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-secondary-container opacity-40 blur-[80px] -z-10"></div>
+<main class="w-full max-w-[400px] glass-panel rounded-xl shadow-[0_8px_24px_rgba(13,59,46,0.05)] p-lg flex flex-col items-center animate-[fadeIn_0.5s_ease-out]">
+<!-- Logo & Brand Header -->
+<div class="flex flex-col items-center mb-xl">
+<div class="w-16 h-16 rounded-full bg-primary-container text-on-primary flex items-center justify-center mb-md shadow-lg">
+<span class="material-symbols-outlined text-4xl" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+</div>
+<h1 class="font-display-currency text-display-currency text-primary mb-xs">MoneyTrack</h1>
+<p class="font-body-md text-body-md text-on-surface-variant">Track every rupee</p>
+</div>
+<!-- Login Form -->
+<form class="w-full flex flex-col gap-md" onsubmit="event.preventDefault();">
+<div class="flex flex-col gap-xs">
+<label class="font-label-caps text-label-caps text-on-surface-variant ml-xs" for="phone">Mobile Number</label>
+<div class="relative flex items-center bg-surface-bright rounded-lg input-ring transition-shadow duration-200">
+<span class="material-symbols-outlined absolute left-md text-outline">call</span>
+<span class="absolute left-[44px] text-body-lg font-body-lg text-on-surface border-r border-surface-variant pr-2">+91</span>
+<input class="w-full bg-transparent border-none focus:ring-0 font-body-lg text-body-lg text-on-surface pl-[92px] pr-md py-md rounded-lg placeholder:text-outline-variant" id="phone" placeholder="Enter your number" required="" type="tel"/>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary font-headline-md text-headline-md py-md rounded-lg shadow-[0_4px_12px_rgba(13,59,46,0.1)] hover:bg-primary transition-colors active:scale-95 duration-150 flex items-center justify-center gap-sm mt-sm" type="submit">
+                Get OTP
+                <span class="material-symbols-outlined text-lg">arrow_forward</span>
+</button>
+</form>
+<!-- Divider -->
+<div class="w-full flex items-center gap-md my-lg">
+<div class="h-px bg-surface-variant flex-1"></div>
+<span class="font-label-muted text-label-muted text-outline">OR</span>
+<div class="h-px bg-surface-variant flex-1"></div>
+</div>
+<!-- Social Login -->
+<button class="w-full bg-surface-bright border border-surface-variant text-on-surface font-body-lg text-body-lg py-sm px-md rounded-lg flex items-center justify-center gap-md hover:bg-surface-container-low transition-colors active:scale-95 duration-150 shadow-sm">
+<svg class="w-5 h-5" viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"></path>
+<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+</svg>
+            Continue with Google
+        </button>
+<!-- Footer Link -->
+<div class="mt-xl text-center">
+<span class="font-body-md text-body-md text-on-surface-variant">Don't have an account?</span>
+<a class="font-headline-md text-headline-md text-primary ml-xs hover:underline decoration-2 underline-offset-4" href="#">Sign up</a>
+</div>
+</main>
+<style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body></html>
