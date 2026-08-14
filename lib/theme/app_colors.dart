@@ -51,4 +51,6 @@ class AppColors {
   static const Color onPastelPurple = Color(0xFF7E22CE);
   static const Color pastelBlue = Color(0xFFDBEAFE);
   static const Color onPastelBlue = Color(0xFF1D4ED8);
+
+  static const Color smsPrimary = Color(0xFF0F9D58); // Green
 }

@@ -6,8 +6,9 @@ class DummyData {
     return [
       Transaction(
         id: '1',
-        merchant: 'Uber Eats',
-        amount: 24.50,
+        merchant: 'Zomato',
+        subtitle: 'HDFC Credit Card',
+        amount: 850.00,
         date: DateTime.now().subtract(const Duration(hours: 2)),
         category: 'Food',
         type: TransactionType.expense,
@@ -15,26 +16,20 @@ class DummyData {
       Transaction(
         id: '2',
         merchant: 'Amazon',
-        amount: 120.00,
+        subtitle: 'SBI Debit Card',
+        amount: 2400.00,
         date: DateTime.now().subtract(const Duration(hours: 5)),
         category: 'Shopping',
         type: TransactionType.expense,
       ),
       Transaction(
         id: '3',
-        merchant: 'Salary',
-        amount: 3200.00,
+        merchant: 'Salary Reversal',
+        subtitle: 'Bank Transfer',
+        amount: 1200.00,
         date: DateTime.now().subtract(const Duration(days: 2)),
         category: 'Income',
         type: TransactionType.income,
-      ),
-      Transaction(
-        id: '4',
-        merchant: 'Electricity Bill',
-        amount: 85.00,
-        date: DateTime.now().subtract(const Duration(days: 3)),
-        category: 'Bills',
-        type: TransactionType.expense,
       ),
     ];
   }

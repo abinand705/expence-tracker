@@ -14,7 +14,7 @@ class TransactionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isIncome = transaction.type == TransactionType.income;
-    final currencyFormatter = NumberFormat.simpleCurrency();
+    final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 0);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
@@ -38,19 +38,20 @@ class TransactionCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: AppSpacing.base),
+                const SizedBox(height: 2),
                 Text(
-                  transaction.category,
-                  style: AppTypography.labelMuted,
+                  transaction.subtitle ?? transaction.category,
+                  style: AppTypography.labelMuted.copyWith(fontSize: 13),
                 ),
               ],
             ),
           ),
           const SizedBox(width: AppSpacing.md),
           Text(
-            '${isIncome ? '+' : '-'}${currencyFormatter.format(transaction.amount)}',
+            '${isIncome ? '+' : '-'}₹ ${NumberFormat('#,##0').format(transaction.amount)}',
             style: AppTypography.headlineMd.copyWith(
-              color: isIncome ? AppColors.successGreen : AppColors.errorRed,
+              color: isIncome ? AppColors.successGreen : AppColors.onSurface,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

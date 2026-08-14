@@ -1,0 +1,130 @@
+import 'package:flutter/material.dart';
+import '../services/mock_sms_service.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_typography.dart';
+
+class NewMessageScreen extends StatefulWidget {
+  const NewMessageScreen({super.key});
+
+  @override
+  State<NewMessageScreen> createState() => _NewMessageScreenState();
+}
+
+class _NewMessageScreenState extends State<NewMessageScreen> {
+  final TextEditingController _toController = TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
+  final MockSmsService _smsService = MockSmsService();
+
+  bool _canSend = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageController.addListener(() {
+      final canSend = _toController.text.trim().isNotEmpty && _messageController.text.trim().isNotEmpty;
+      if (canSend != _canSend) {
+        setState(() => _canSend = canSend);
+      }
+    });
+    _toController.addListener(() {
+      final canSend = _toController.text.trim().isNotEmpty && _messageController.text.trim().isNotEmpty;
+      if (canSend != _canSend) {
+        setState(() => _canSend = canSend);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _toController.dispose();
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  void _sendMessage() {
+    if (_canSend) {
+      _smsService.createNewConversation(_toController.text.trim(), _messageController.text.trim());
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('New Conversation', style: AppTypography.headlineMd),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.onSurface),
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.md),
+            color: AppColors.surfaceContainerLowest,
+            child: Row(
+              children: [
+                Text('To:', style: AppTypography.bodyLg.copyWith(color: AppColors.outline)),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: TextField(
+                    controller: _toController,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Type a name or phone number...',
+                      hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outlineVariant),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    style: AppTypography.bodyLg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, thickness: 1),
+          const Spacer(),
+          // Input Area
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
+            color: AppColors.surfaceContainerLowest,
+            child: SafeArea(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'Type an SMS message...',
+                        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                        filled: true,
+                        fillColor: AppColors.surfaceContainer,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  CircleAvatar(
+                    backgroundColor: _canSend ? AppColors.smsPrimary : AppColors.surfaceContainerHigh,
+                    child: IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                      onPressed: _canSend ? _sendMessage : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
