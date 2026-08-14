@@ -16,8 +16,13 @@ class TransactionsScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      drawer: const AppDrawer(),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+        ),
         title: Text('Transactions', style: AppTypography.headlineMd),
         backgroundColor: AppColors.background,
         elevation: 0,

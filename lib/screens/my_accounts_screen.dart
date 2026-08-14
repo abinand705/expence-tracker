@@ -11,6 +11,12 @@ class MyAccountsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+        ),
         title: Text('My Accounts', style: AppTypography.headlineMd),
         backgroundColor: AppColors.background,
         elevation: 0,
