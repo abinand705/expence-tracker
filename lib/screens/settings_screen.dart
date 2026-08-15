@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../services/auth_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -30,6 +31,25 @@ class SettingsScreen extends StatelessWidget {
           _buildSectionHeader('ABOUT'),
           _buildSettingsTile(Icons.info, 'App Version', subtitle: '1.0.0'),
           _buildSettingsTile(Icons.help, 'Help & Support'),
+          const SizedBox(height: AppSpacing.lg),
+          _buildSettingsTile(
+            Icons.logout, 
+            'Logout', 
+            textColor: AppColors.errorRed,
+            iconColor: AppColors.errorRed,
+            trailing: const SizedBox.shrink(),
+            onTap: () async {
+              try {
+                await AuthService().logout();
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.errorRed),
+                  );
+                }
+              }
+            },
+          ),
         ],
       ),
     );
@@ -42,7 +62,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsTile(IconData icon, String title, {String? subtitle, Widget? trailing}) {
+  Widget _buildSettingsTile(IconData icon, String title, {String? subtitle, Widget? trailing, Color? textColor, Color? iconColor, VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
@@ -51,8 +71,9 @@ class SettingsScreen extends StatelessWidget {
         boxShadow: AppShadows.level1,
       ),
       child: ListTile(
-        leading: Icon(icon, color: AppColors.primaryContainer),
-        title: Text(title, style: AppTypography.bodyLg),
+        onTap: onTap,
+        leading: Icon(icon, color: iconColor ?? AppColors.primaryContainer),
+        title: Text(title, style: AppTypography.bodyLg.copyWith(color: textColor)),
         subtitle: subtitle != null ? Text(subtitle, style: AppTypography.bodyMd) : null,
         trailing: trailing ?? const Icon(Icons.chevron_right, color: AppColors.outline),
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),

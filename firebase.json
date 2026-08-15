@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "com-example-phone-6a7e5",
+          "appId": "1:169757099481:android:6e95785a642bfaf619c5c8",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "com-example-phone-6a7e5",
+          "configurations": {
+            "android": "1:169757099481:android:6e95785a642bfaf619c5c8",
+            "ios": "1:169757099481:ios:56687d0b935bc4e519c5c8",
+            "macos": "1:169757099481:ios:56687d0b935bc4e519c5c8",
+            "web": "1:169757099481:web:7a5b140fce1fc94019c5c8",
+            "windows": "1:169757099481:web:fca4d047d068154319c5c8"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "moneytrack",
+    "location": "asia-south1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

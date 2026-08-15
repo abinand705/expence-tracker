@@ -5,6 +5,7 @@ import '../theme/app_typography.dart';
 import '../screens/my_accounts_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/help_support_screen.dart';
+import '../services/auth_service.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -63,8 +64,17 @@ class AppDrawer extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
+              onPressed: () async {
+                Navigator.pop(context); // Close drawer
+                try {
+                  await AuthService().logout();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString()), backgroundColor: AppColors.errorRed),
+                    );
+                  }
+                }
               },
               icon: const Icon(Icons.logout, color: AppColors.errorRed),
               label: Text('Log Out', style: AppTypography.bodyLg.copyWith(color: AppColors.errorRed, fontWeight: FontWeight.bold)),

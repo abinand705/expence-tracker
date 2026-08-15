@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/mock_sms_service.dart';
+import '../repositories/transaction_repository.dart';
 import '../models/transaction.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -15,26 +15,55 @@ class TransactionsScreen extends StatefulWidget {
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
+  final TransactionRepository _transactionRepo = TransactionRepository();
+  
   String _selectedFilter = 'All';
+  String _searchQuery = '';
   final List<String> _filters = ['All', 'UPI', 'Credit Card', 'Debits', 'Credits'];
+  
+  List<Transaction> _allTransactions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTransactions();
+  }
+
+  Future<void> _loadTransactions() async {
+    setState(() => _isLoading = true);
+    try {
+      final transactions = await _transactionRepo.getTransactions();
+      setState(() {
+        _allTransactions = transactions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: MockSmsService(),
-      builder: (context, _) {
-        final transactions = MockSmsService().parsedTransactions;
-        List<Transaction> filteredTransactions = transactions.where((t) {
-          if (_selectedFilter == 'All') return true;
-          final msg = t.rawMessage?.toLowerCase() ?? '';
-          if (_selectedFilter == 'UPI') return msg.contains('upi');
-          if (_selectedFilter == 'Credit Card') return msg.contains('cc') || msg.contains('card') || msg.contains('credit');
-          if (_selectedFilter == 'Debits') return t.type == TransactionType.expense;
-          if (_selectedFilter == 'Credits') return t.type == TransactionType.income;
-          return true;
-        }).toList();
+    List<Transaction> filteredTransactions = _allTransactions.where((t) {
+      if (_searchQuery.isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchMerchant = t.merchant.toLowerCase().contains(query);
+        final matchCategory = t.category.toLowerCase().contains(query);
+        final matchSubtitle = (t.subtitle ?? '').toLowerCase().contains(query);
+        if (!matchMerchant && !matchCategory && !matchSubtitle) return false;
+      }
+      
+      if (_selectedFilter == 'All') return true;
+      final msg = t.rawMessage?.toLowerCase() ?? '';
+      if (_selectedFilter == 'UPI') return msg.contains('upi');
+      if (_selectedFilter == 'Credit Card') return msg.contains('cc') || msg.contains('card') || msg.contains('credit');
+      if (_selectedFilter == 'Debits') return t.type == TransactionType.expense;
+      if (_selectedFilter == 'Credits') return t.type == TransactionType.income;
+      return true;
+    }).toList();
 
-        return Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         leading: IconButton(
@@ -47,86 +76,84 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
+      drawer: const AppDrawer(),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.sm),
             child: TextField(
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val;
+                });
+              },
               decoration: InputDecoration(
                 hintText: 'Search expenses, merchants...',
                 hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
                 prefixIcon: const Icon(Icons.search, color: AppColors.outline),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: AppColors.surfaceContainerLowest,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.outlineVariant),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.outlineVariant),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary),
+                  borderRadius: BorderRadius.circular(30),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
           ),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.md),
             child: Row(
               children: _filters.map((filter) {
                 final isSelected = _selectedFilter == filter;
                 return Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: FilterChip(
-                    label: Text(
-                      filter,
-                      style: AppTypography.bodyMd.copyWith(
-                        color: isSelected ? Colors.white : AppColors.primary,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
+                    label: Text(filter),
                     selected: isSelected,
                     onSelected: (selected) {
                       setState(() {
-                        _selectedFilter = filter;
+                        if (selected) _selectedFilter = filter;
                       });
                     },
-                    backgroundColor: AppColors.surface,
+                    backgroundColor: AppColors.surfaceContainerLowest,
                     selectedColor: AppColors.primary,
-                    showCheckmark: false,
+                    labelStyle: AppTypography.bodyMd.copyWith(
+                      color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                       side: BorderSide(
                         color: isSelected ? AppColors.primary : AppColors.outlineVariant,
                       ),
                     ),
+                    showCheckmark: false,
                   ),
                 );
               }).toList(),
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.only(
-                left: AppSpacing.containerMargin,
-                right: AppSpacing.containerMargin,
-                top: AppSpacing.md,
-                bottom: 100,
-              ),
-              itemCount: filteredTransactions.length,
-              itemBuilder: (context, index) {
-                return TransactionCard(transaction: filteredTransactions[index]);
-              },
-            ),
+            child: _isLoading 
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : filteredTransactions.isEmpty 
+                  ? const Center(child: Text("No transactions found"))
+                  : RefreshIndicator(
+                      onRefresh: _loadTransactions,
+                      color: AppColors.primary,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
+                        itemCount: filteredTransactions.length,
+                        itemBuilder: (context, index) {
+                          return TransactionCard(transaction: filteredTransactions[index]);
+                        },
+                      ),
+                    ),
           ),
         ],
       ),
     );
-    });
   }
 }

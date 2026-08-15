@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'theme/app_theme.dart';
-import 'screens/splash_login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'screens/auth_wrapper.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const MoneyTrackApp());
 }
 
@@ -14,7 +20,7 @@ class MoneyTrackApp extends StatelessWidget {
     return MaterialApp(
       title: 'MoneyTrack',
       theme: AppTheme.lightTheme,
-      home: const SplashLoginScreen(),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }

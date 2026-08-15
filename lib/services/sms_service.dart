@@ -25,10 +25,10 @@ class AccountInfo {
   });
 }
 
-class MockSmsService extends ChangeNotifier {
-  static final MockSmsService _instance = MockSmsService._internal();
-  factory MockSmsService() => _instance;
-  MockSmsService._internal() {
+class SmsService extends ChangeNotifier {
+  static final SmsService _instance = SmsService._internal();
+  factory SmsService() => _instance;
+  SmsService._internal() {
     _initPreferences();
   }
 

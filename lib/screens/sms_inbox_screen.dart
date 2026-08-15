@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../models/sms_models.dart';
-import '../services/mock_sms_service.dart';
+import '../services/sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -20,7 +20,7 @@ class SmsInboxScreen extends StatefulWidget {
 }
 
 class _SmsInboxScreenState extends State<SmsInboxScreen> {
-  final MockSmsService _smsService = MockSmsService();
+  final SmsService _smsService = SmsService();
   final TextEditingController _searchController = TextEditingController();
 
   @override

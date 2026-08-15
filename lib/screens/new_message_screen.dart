@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/mock_sms_service.dart';
+import '../services/sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -15,7 +15,7 @@ class NewMessageScreen extends StatefulWidget {
 class _NewMessageScreenState extends State<NewMessageScreen> {
   final TextEditingController _toController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
-  final MockSmsService _smsService = MockSmsService();
+  final SmsService _smsService = SmsService();
 
   bool _canSend = false;
 

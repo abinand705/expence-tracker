@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../services/mock_sms_service.dart';
+import '../services/sms_service.dart';
 import '../models/message_settings.dart';
 
 class MessagesSettingsScreen extends StatefulWidget {
@@ -13,7 +13,7 @@ class MessagesSettingsScreen extends StatefulWidget {
 }
 
 class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
-  final MockSmsService _smsService = MockSmsService();
+  final SmsService _smsService = SmsService();
 
   @override
   Widget build(BuildContext context) {

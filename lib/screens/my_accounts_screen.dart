@@ -1,75 +1,118 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/mock_sms_service.dart';
+import '../repositories/account_repository.dart';
+import '../models/account.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 
-class MyAccountsScreen extends StatelessWidget {
+class MyAccountsScreen extends StatefulWidget {
   const MyAccountsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: MockSmsService(),
-      builder: (context, _) {
-        final accounts = MockSmsService().linkedAccounts;
-        final totalNetWorth = accounts.fold(0.0, (sum, acc) => sum + acc.balance);
-        final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+  State<MyAccountsScreen> createState() => _MyAccountsScreenState();
+}
 
-        return Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-            ),
-            title: Text('My Accounts', style: AppTypography.headlineMd),
-            backgroundColor: AppColors.background,
-            elevation: 0,
+class _MyAccountsScreenState extends State<MyAccountsScreen> {
+  final AccountRepository _accountRepo = AccountRepository();
+  List<Account> _accounts = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAccounts();
+  }
+
+  Future<void> _loadAccounts() async {
+    setState(() => _isLoading = true);
+    try {
+      final accounts = await _accountRepo.getAccounts();
+      setState(() {
+        _accounts = accounts;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () => Scaffold.of(context).openDrawer(),
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
-                const SizedBox(height: AppSpacing.md),
-                _buildStatsCard(),
-                const SizedBox(height: AppSpacing.xl),
-                Text(
-                  'Linked Accounts',
-                  style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (accounts.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: Text('No accounts found from messages.', style: AppTypography.bodyLg),
-                  )
-                else
-                  ...accounts.map((acc) => Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                        child: _buildLinkedAccountCard(
-                          bankName: acc.bankName,
-                          accountType: acc.accountType,
-                          accountNumber: acc.accountNumber,
-                          balance: currencyFormatter.format(acc.balance),
-                          accentColor: acc.accentColor,
-                          icon: Icons.account_balance,
-                        ),
-                      )).toList(),
-                const SizedBox(height: AppSpacing.lg),
-                _buildLinkAnotherBankButton(context),
-                const SizedBox(height: 100),
-              ],
+          title: Text('My Accounts', style: AppTypography.headlineMd),
+          backgroundColor: AppColors.background,
+          elevation: 0,
+        ),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    final totalNetWorth = _accounts.fold(0.0, (sum, acc) => sum + acc.balance);
+    final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {
+            Scaffold.of(context).openDrawer();
+          },
+        ),
+        title: Text('My Accounts', style: AppTypography.headlineMd),
+        backgroundColor: AppColors.background,
+        elevation: 0,
+      ),
+          body: RefreshIndicator(
+            onRefresh: _loadAccounts,
+            color: AppColors.primary,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildStatsCard(),
+                  const SizedBox(height: AppSpacing.xl),
+                  Text(
+                    'Linked Accounts',
+                    style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (_accounts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Text('No accounts found from messages.', style: AppTypography.bodyLg),
+                    )
+                  else
+                    ..._accounts.map((acc) => Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: _buildLinkedAccountCard(
+                            bankName: acc.bankName,
+                            accountType: acc.accountType,
+                            accountNumber: acc.maskedAccountNumber,
+                            balance: currencyFormatter.format(acc.balance),
+                            accentColor: acc.accentColor,
+                            icon: Icons.account_balance,
+                          ),
+                        )).toList(),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildLinkAnotherBankButton(context),
+                  const SizedBox(height: 100),
+                ],
+              ),
             ),
           ),
         );
-      },
-    );
   }
 
   Widget _buildNetWorthCard(BuildContext context, NumberFormat formatter, double totalNetWorth) {
@@ -99,7 +142,7 @@ class MyAccountsScreen extends StatelessWidget {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    MockSmsService().refreshAccounts();
+                    _loadAccounts();
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Balances updated from recent messages.')),
                     );
