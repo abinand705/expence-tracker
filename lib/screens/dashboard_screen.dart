@@ -1,20 +1,62 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'dart:math';
-import '../models/dummy_data.dart';
+import '../services/mock_sms_service.dart';
+import '../models/transaction.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/transaction_card.dart';
 import '../widgets/app_drawer.dart';
 
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+class DashboardScreen extends StatefulWidget {
+  final VoidCallback? onSeeAllClicked;
+
+  const DashboardScreen({
+    super.key,
+    this.onSeeAllClicked,
+  });
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  String _selectedTrendFilter = 'Month';
 
   @override
   Widget build(BuildContext context) {
-    final transactions = DummyData.getTransactions();
-    final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+    return ListenableBuilder(
+      listenable: MockSmsService(),
+      builder: (context, _) {
+        final allTransactions = MockSmsService().parsedTransactions;
+        final transactions = allTransactions.take(3).toList();
+        final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+
+        final now = DateTime.now();
+        final hour = now.hour;
+        String greeting = 'Good evening, Abhinand';
+        if (hour < 12) greeting = 'Good morning, Abhinand';
+        else if (hour < 17) greeting = 'Good afternoon, Abhinand';
+        
+        final accounts = MockSmsService().linkedAccounts;
+        final totalBalance = accounts.fold(0.0, (sum, acc) => sum + acc.balance);
+
+        final currentMonth = now.month;
+        final currentYear = now.year;
+        final currentMonthSpend = allTransactions
+            .where((t) => t.date.month == currentMonth && t.date.year == currentYear && t.type == TransactionType.expense)
+            .fold(0.0, (sum, t) => sum + t.amount);
+            
+        final lastMonth = currentMonth == 1 ? 12 : currentMonth - 1;
+        final lastMonthYear = currentMonth == 1 ? currentYear - 1 : currentYear;
+        final lastMonthSpend = allTransactions
+            .where((t) => t.date.month == lastMonth && t.date.year == lastMonthYear && t.type == TransactionType.expense)
+            .fold(0.0, (sum, t) => sum + t.amount);
+            
+        final spendChange = lastMonthSpend == 0 ? 0.0 : ((currentMonthSpend - lastMonthSpend) / lastMonthSpend) * 100;
+        
+        final monthlyTarget = MockSmsService().monthlyTargetAmount;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -29,8 +71,7 @@ class DashboardScreen extends StatelessWidget {
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
-      body: SafeArea(
-        child: CustomScrollView(
+      body: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
@@ -39,18 +80,20 @@ class DashboardScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Good morning, Abhinand',
+                      greeting,
                       style: AppTypography.headlineMd.copyWith(
                         color: AppColors.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    _buildTotalBalanceCard(currencyFormatter),
+                    _buildTotalBalanceCard(currencyFormatter, totalBalance),
                     const SizedBox(height: AppSpacing.md),
-                    _buildStatsRow(),
+                    _buildStatsRow(context, currencyFormatter, currentMonthSpend, spendChange, monthlyTarget),
                     const SizedBox(height: AppSpacing.md),
-                    _buildSpendCategoriesCard(),
+                    _buildSpendingTrendsCard(allTransactions),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildSpendCategoriesCard(allTransactions, currencyFormatter),
                     const SizedBox(height: AppSpacing.xl),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -61,11 +104,14 @@ class DashboardScreen extends StatelessWidget {
                             color: AppColors.primaryContainer,
                           ),
                         ),
-                        Text(
-                          'SEE ALL',
-                          style: AppTypography.labelCaps.copyWith(
-                            color: AppColors.primaryContainer,
-                            fontWeight: FontWeight.w700,
+                        GestureDetector(
+                          onTap: widget.onSeeAllClicked,
+                          child: Text(
+                            'SEE ALL',
+                            style: AppTypography.labelCaps.copyWith(
+                              color: AppColors.primaryContainer,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
@@ -89,11 +135,11 @@ class DashboardScreen extends StatelessWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 
-  Widget _buildTotalBalanceCard(NumberFormat formatter) {
+  Widget _buildTotalBalanceCard(NumberFormat formatter, double totalBalance) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -114,7 +160,7 @@ class DashboardScreen extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.surfaceContainer,
                   shape: BoxShape.circle,
                 ),
@@ -124,7 +170,7 @@ class DashboardScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            formatter.format(45250.00),
+            formatter.format(totalBalance),
             style: AppTypography.displayCurrency,
           ),
         ],
@@ -132,7 +178,11 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildStatsRow(BuildContext context, NumberFormat formatter, double currentSpend, double spendChange, double target) {
+    final bool isSpendUp = spendChange > 0;
+    final bool isWithinTarget = currentSpend <= target;
+    final double targetRemaining = target - currentSpend;
+    
     return Row(
       children: [
         Expanded(
@@ -152,17 +202,24 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  '₹ 12,400',
-                  style: AppTypography.headlineMd.copyWith(color: AppColors.errorRed, fontWeight: FontWeight.bold),
+                  formatter.format(currentSpend),
+                  style: AppTypography.headlineMd.copyWith(
+                    color: isWithinTarget ? AppColors.onSurface : AppColors.errorRed, 
+                    fontWeight: FontWeight.bold
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Row(
                   children: [
-                    const Icon(Icons.trending_up, color: AppColors.errorRed, size: 14),
+                    Icon(isSpendUp ? Icons.trending_up : Icons.trending_down, 
+                      color: isSpendUp ? AppColors.errorRed : AppColors.successGreen, size: 14),
                     const SizedBox(width: 4),
                     Text(
-                      '14% vs last month',
-                      style: AppTypography.labelMuted.copyWith(color: AppColors.errorRed, fontSize: 10),
+                      '${spendChange.abs().toStringAsFixed(1)}% vs last month',
+                      style: AppTypography.labelMuted.copyWith(
+                        color: isSpendUp ? AppColors.errorRed : AppColors.successGreen, 
+                        fontSize: 10
+                      ),
                     ),
                   ],
                 ),
@@ -172,37 +229,41 @@ class DashboardScreen extends StatelessWidget {
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: Container(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              boxShadow: AppShadows.level1,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Target Saved',
-                  style: AppTypography.bodyMd.copyWith(color: AppColors.inversePrimary),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  '₹ 8,000',
-                  style: AppTypography.headlineMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  children: [
-                    const Icon(Icons.check_circle_outline, color: AppColors.successGreen, size: 14),
-                    const SizedBox(width: 4),
-                    Text(
-                      'On track',
-                      style: AppTypography.labelMuted.copyWith(color: AppColors.successGreen, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ],
+          child: GestureDetector(
+            onDoubleTap: () => _showTargetModal(context, target),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: isWithinTarget ? AppColors.primary : AppColors.errorRed,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                boxShadow: AppShadows.level1,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isWithinTarget ? 'Target Remaining' : 'Over Target',
+                    style: AppTypography.bodyMd.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    formatter.format(targetRemaining.abs()),
+                    style: AppTypography.headlineMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Icon(isWithinTarget ? Icons.check_circle_outline : Icons.warning_amber_rounded, 
+                        color: Colors.white, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        isWithinTarget ? 'On track' : 'Exceeded',
+                        style: AppTypography.labelMuted.copyWith(color: Colors.white, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -210,7 +271,155 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSpendCategoriesCard() {
+  void _showTargetModal(BuildContext context, double currentTarget) {
+    final controller = TextEditingController(text: currentTarget.toStringAsFixed(0));
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.surfaceBright,
+          title: Text('Set Monthly Target', style: AppTypography.headlineMd),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Target Amount',
+              prefixText: '₹ ',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: AppTypography.bodyLg),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final val = double.tryParse(controller.text);
+                if (val != null) {
+                  MockSmsService().setMonthlyTargetAmount(val);
+                }
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryContainer, foregroundColor: Colors.white),
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSpendingTrendsCard(List<Transaction> transactions) {
+    final filters = ['Day', 'Week', 'Month', 'Year', 'Custom'];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(AppRadius.xl),
+        boxShadow: AppShadows.level1,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Spending Trends',
+            style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: filters.map((filter) {
+                final isSelected = _selectedTrendFilter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: AppSpacing.sm),
+                  child: GestureDetector(
+                    onTap: () async {
+                      if (filter == 'Custom') {
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          builder: (context, child) {
+                            return Theme(
+                              data: Theme.of(context).copyWith(
+                                colorScheme: const ColorScheme.light(
+                                  primary: AppColors.primary,
+                                  onPrimary: Colors.white,
+                                  onSurface: AppColors.onSurface,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _selectedTrendFilter = filter;
+                          });
+                        }
+                      } else {
+                        setState(() {
+                          _selectedTrendFilter = filter;
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : AppColors.surfaceContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        filter,
+                        style: AppTypography.bodyMd.copyWith(
+                          color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          SizedBox(
+            height: 150,
+            child: CustomPaint(
+              painter: TrendChartPainter(filter: _selectedTrendFilter, transactions: transactions),
+              size: const Size(double.infinity, 150),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSpendCategoriesCard(List<Transaction> allTransactions, NumberFormat formatter) {
+    final currentMonth = DateTime.now().month;
+    final currentYear = DateTime.now().year;
+    
+    double food = 0, shopping = 0, bills = 0, others = 0;
+    for (var t in allTransactions) {
+      if (t.type != TransactionType.expense || t.date.month != currentMonth || t.date.year != currentYear) continue;
+      if (t.category == 'Food') food += t.amount;
+      else if (t.category == 'Shopping') shopping += t.amount;
+      else if (t.category == 'Bills') bills += t.amount;
+      else others += t.amount;
+    }
+    
+    double total = food + shopping + bills + others;
+    final displayTotal = total;
+    if (total == 0) total = 1; // prevent divide by zero
+    
+    final pFood = food / total;
+    final pShop = shopping / total;
+    final pBills = bills / total;
+    final pOthers = others / total;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
@@ -233,7 +442,12 @@ class DashboardScreen extends StatelessWidget {
                 width: 120,
                 height: 120,
                 child: CustomPaint(
-                  painter: DonutChartPainter(),
+                  painter: DonutChartPainter(
+                    foodPct: pFood, 
+                    shopPct: pShop, 
+                    billsPct: pBills, 
+                    othersPct: pOthers
+                  ),
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -243,7 +457,7 @@ class DashboardScreen extends StatelessWidget {
                           style: AppTypography.labelMuted.copyWith(fontSize: 10),
                         ),
                         Text(
-                          '12.4k',
+                          displayTotal >= 1000 ? '${(displayTotal/1000).toStringAsFixed(1)}k' : displayTotal.toStringAsFixed(0),
                           style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -255,11 +469,23 @@ class DashboardScreen extends StatelessWidget {
               Expanded(
                 child: Column(
                   children: [
-                    _buildLegendItem('Food', '40%', const Color(0xFFC2185B)),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildLegendItem('Shopping', '35%', const Color(0xFF7B1FA2)),
-                    const SizedBox(height: AppSpacing.sm),
-                    _buildLegendItem('Bills', '25%', const Color(0xFF1976D2)),
+                    if (pFood > 0) ...[
+                      _buildLegendItem('Food', '${(pFood * 100).toStringAsFixed(0)}%', const Color(0xFFC2185B)),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (pShop > 0) ...[
+                      _buildLegendItem('Shopping', '${(pShop * 100).toStringAsFixed(0)}%', const Color(0xFF7B1FA2)),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (pBills > 0) ...[
+                      _buildLegendItem('Bills', '${(pBills * 100).toStringAsFixed(0)}%', const Color(0xFF1976D2)),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (pOthers > 0) ...[
+                      _buildLegendItem('Others', '${(pOthers * 100).toStringAsFixed(0)}%', const Color(0xFFF57C00)),
+                    ],
+                    if (displayTotal == 0)
+                      Text('No data this month', style: AppTypography.labelMuted),
                   ],
                 ),
               ),
@@ -301,6 +527,18 @@ class DashboardScreen extends StatelessWidget {
 }
 
 class DonutChartPainter extends CustomPainter {
+  final double foodPct;
+  final double shopPct;
+  final double billsPct;
+  final double othersPct;
+
+  DonutChartPainter({
+    required this.foodPct,
+    required this.shopPct,
+    required this.billsPct,
+    required this.othersPct,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -330,29 +568,148 @@ class DonutChartPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    // Background circle (optional, but good for gaps)
-    // The design looks like it doesn't have gaps but relies on overlapping or perfectly touching arcs.
-    // StrokeCap.round creates rounded ends which means they overlap slightly if drawn sequentially.
-    
-    // We draw them in order: Pink (0 to 40%), Purple (40% to 75%), Blue (75% to 100%)
-    // Start angle: -90 degrees (top)
+    // Others - Orange
+    final paintOthers = Paint()
+      ..color = const Color(0xFFF57C00)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
     double startAngle = -pi / 2;
 
-    // Draw Pink (40%)
-    double sweepPink = 2 * pi * 0.40;
-    canvas.drawArc(rect, startAngle, sweepPink, false, paintPink);
+    if (foodPct > 0) {
+      double sweep = 2 * pi * foodPct;
+      canvas.drawArc(rect, startAngle, sweep, false, paintPink);
+      startAngle += sweep;
+    }
     
-    // Draw Purple (35%)
-    startAngle += sweepPink;
-    double sweepPurple = 2 * pi * 0.35;
-    canvas.drawArc(rect, startAngle, sweepPurple, false, paintPurple);
+    if (shopPct > 0) {
+      double sweep = 2 * pi * shopPct;
+      canvas.drawArc(rect, startAngle, sweep, false, paintPurple);
+      startAngle += sweep;
+    }
     
-    // Draw Blue (25%)
-    startAngle += sweepPurple;
-    double sweepBlue = 2 * pi * 0.25;
-    canvas.drawArc(rect, startAngle, sweepBlue, false, paintBlue);
+    if (billsPct > 0) {
+      double sweep = 2 * pi * billsPct;
+      canvas.drawArc(rect, startAngle, sweep, false, paintBlue);
+      startAngle += sweep;
+    }
+    
+    if (othersPct > 0) {
+      double sweep = 2 * pi * othersPct;
+      canvas.drawArc(rect, startAngle, sweep, false, paintOthers);
+    }
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class TrendChartPainter extends CustomPainter {
+  final String filter;
+  final List<Transaction> transactions;
+  
+  TrendChartPainter({required this.filter, required this.transactions});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paintGrid = Paint()
+      ..color = AppColors.surfaceContainerHigh
+      ..strokeWidth = 1;
+    final textStyle = AppTypography.labelMuted.copyWith(fontSize: 10, color: AppColors.outline);
+
+    final yLabels = ['15k', '10k', '5k'];
+    for (int i = 0; i < 3; i++) {
+      final y = size.height * (i / 3) + 20;
+      canvas.drawLine(Offset(30, y), Offset(size.width, y), paintGrid);
+      
+      final textSpan = TextSpan(text: yLabels[i], style: textStyle);
+      final textPainter = TextPainter(text: textSpan, textDirection: TextDirection.ltr);
+      textPainter.layout();
+      textPainter.paint(canvas, Offset(0, y - 6));
+    }
+
+    List<double> data = [0, 0, 0, 0, 0, 0, 0];
+    
+    // Real mapping logic based on filter
+    final now = DateTime.now();
+    if (filter == 'Day' || filter == 'Week' || filter == 'Month' || filter == 'Year' || filter == 'Custom') {
+      // Just map the recent 7 days or weeks or months. For simplicity in this functional plan,
+      // we'll sum expenses grouped by recent 7 buckets
+      List<double> buckets = List.filled(7, 0.0);
+      
+      for (var t in transactions) {
+        if (t.type != TransactionType.expense) continue;
+        
+        int daysDiff = now.difference(t.date).inDays;
+        
+        if (filter == 'Week') {
+          if (daysDiff < 7) {
+            buckets[6 - daysDiff] += t.amount;
+          }
+        } else if (filter == 'Month') {
+          if (daysDiff < 30) {
+            int bucketIdx = 6 - (daysDiff ~/ 5);
+            if (bucketIdx >= 0 && bucketIdx < 7) {
+              buckets[bucketIdx] += t.amount;
+            }
+          }
+        } else if (filter == 'Year') {
+          if (daysDiff < 365) {
+            int bucketIdx = 6 - (daysDiff ~/ 52);
+            if (bucketIdx >= 0 && bucketIdx < 7) {
+              buckets[bucketIdx] += t.amount;
+            }
+          }
+        } else {
+          // Default day / custom fallback
+          if (daysDiff < 7) {
+            buckets[6 - daysDiff] += t.amount;
+          }
+        }
+      }
+      
+      double maxVal = buckets.fold(0.0, (m, v) => v > m ? v : m);
+      if (maxVal == 0) maxVal = 1; // avoid divide by zero
+      
+      data = buckets.map((v) => v / maxVal).toList();
+    }
+
+    final path = Path();
+    final paintLine = Paint()
+      ..color = AppColors.primaryContainer
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final startX = 30.0;
+    final stepX = (size.width - startX) / (data.length - 1);
+    
+    double mapY(double value) {
+      return size.height - (value * size.height) + 10;
+    }
+
+    path.moveTo(startX, mapY(data[0]));
+    
+    for (int i = 0; i < data.length - 1; i++) {
+      final p0 = Offset(startX + i * stepX, mapY(data[i]));
+      final p1 = Offset(startX + (i + 1) * stepX, mapY(data[i + 1]));
+      
+      final controlPointX = p0.dx + (p1.dx - p0.dx) / 2;
+      
+      path.cubicTo(
+        controlPointX, p0.dy,
+        controlPointX, p1.dy,
+        p1.dx, p1.dy,
+      );
+    }
+    
+    canvas.drawPath(path, paintLine);
+  }
+
+  @override
+  bool shouldRepaint(covariant TrendChartPainter oldDelegate) {
+    return oldDelegate.filter != filter;
+  }
 }

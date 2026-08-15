@@ -16,8 +16,30 @@ class TransactionCard extends StatelessWidget {
     final bool isIncome = transaction.type == TransactionType.income;
     final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 0);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
+    return GestureDetector(
+      onTap: () {
+        if (transaction.rawMessage != null) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppColors.surfaceContainerLowest,
+              title: Text('Message Details', style: AppTypography.headlineMd),
+              content: Text(
+                transaction.rawMessage!,
+                style: AppTypography.bodyMd,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Close', style: AppTypography.labelCaps.copyWith(color: AppColors.primary)),
+                ),
+              ],
+            ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
@@ -40,7 +62,7 @@ class TransactionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  transaction.subtitle ?? transaction.category,
+                  '${DateFormat('MMM dd, hh:mm a').format(transaction.date)} • ${transaction.subtitle ?? transaction.category}',
                   style: AppTypography.labelMuted.copyWith(fontSize: 13),
                 ),
               ],
@@ -56,6 +78,6 @@ class TransactionCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }

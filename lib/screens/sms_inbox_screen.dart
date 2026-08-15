@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 import '../models/sms_models.dart';
 import '../services/mock_sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../utils/expense_parser.dart';
 import 'conversation_view_screen.dart';
 import 'new_message_screen.dart';
-import 'package:intl/intl.dart';
+import 'messages_settings_screen.dart';
+import 'bin_screen.dart';
 
 class SmsInboxScreen extends StatefulWidget {
   const SmsInboxScreen({super.key});
@@ -46,6 +50,80 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
     }
   }
 
+  void _showConversationOptions(BuildContext context, Conversation conv) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceBright,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: AppSpacing.sm),
+            ListTile(
+              leading: Icon(conv.isPinned ? Icons.push_pin_outlined : Icons.push_pin, color: AppColors.primaryContainer),
+              title: Text(conv.isPinned ? 'Unpin' : 'Pin', style: AppTypography.bodyLg),
+              onTap: () {
+                Navigator.pop(context);
+                _smsService.togglePin(conv.id);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
+              title: Text('Delete', style: AppTypography.bodyLg.copyWith(color: AppColors.errorRed)),
+              onTap: () {
+                Navigator.pop(context);
+                _smsService.deleteConversation(conv.id);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBlockedContacts(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return ListenableBuilder(
+          listenable: _smsService,
+          builder: (context, _) {
+            final blocked = _smsService.blockedNumbers.toList();
+            return AlertDialog(
+              backgroundColor: AppColors.surfaceBright,
+              title: Text('Blocked Contacts', style: AppTypography.headlineMd),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: blocked.isEmpty 
+                  ? Text('No blocked contacts.', style: AppTypography.bodyLg)
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: blocked.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          title: Text(blocked[index], style: AppTypography.bodyLg),
+                          trailing: TextButton(
+                            onPressed: () => _smsService.unblockNumber(blocked[index]),
+                            child: Text('Unblock', style: AppTypography.bodyMd.copyWith(color: AppColors.primaryContainer)),
+                          ),
+                        );
+                      },
+                    ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('Close', style: AppTypography.bodyLg.copyWith(color: AppColors.primaryContainer)),
+                ),
+              ],
+            );
+          }
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,20 +138,78 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
         title: Text('Messages', style: AppTypography.headlineMd),
         backgroundColor: AppColors.background,
         elevation: 0,
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80.0), // Padding to clear bottom nav
-        child: FloatingActionButton.extended(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const NewMessageScreen()),
-            );
-          },
-          backgroundColor: AppColors.smsPrimary,
-          icon: const Icon(Icons.message, color: Colors.white),
-          label: Text('New Message', style: AppTypography.bodyMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: AppColors.onSurface),
+            color: AppColors.surfaceBright,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
+            onSelected: (value) {
+              if (value == 'new') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const NewMessageScreen()));
+              } else if (value == 'settings') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const MessagesSettingsScreen()));
+              } else if (value == 'read') {
+                _smsService.markAllAsRead();
+              } else if (value == 'bin') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const BinScreen()));
+              } else if (value == 'blocked') {
+                _showBlockedContacts(context);
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              PopupMenuItem<String>(
+                value: 'new',
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_outlined, color: AppColors.onSurfaceVariant, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text('New message', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'read',
+                child: Row(
+                  children: [
+                    const Icon(Icons.checklist, color: AppColors.onSurfaceVariant, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text('Mark all as read', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    const Icon(Icons.settings_outlined, color: AppColors.onSurfaceVariant, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text('Message settings', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'blocked',
+                child: Row(
+                  children: [
+                    const Icon(Icons.block, color: AppColors.onSurfaceVariant, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text('Blocked contacts', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'bin',
+                child: Row(
+                  children: [
+                    const Icon(Icons.delete_outline, color: AppColors.errorRed, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text('Bin', style: AppTypography.bodyMd.copyWith(color: AppColors.errorRed)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: _smsService,
@@ -120,73 +256,132 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
                 child: conversations.isEmpty 
                   ? Center(child: Text('No messages found.', style: AppTypography.bodyLg))
                   : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 100), // For bottom nav padding
+                      padding: const EdgeInsets.only(bottom: 100),
                       itemCount: conversations.length,
                       itemBuilder: (context, index) {
                         final conv = conversations[index];
                         final bool hasUnread = conv.unreadCount > 0;
                         final latestMsg = conv.latestMessage;
+                        final parsed = latestMsg != null ? ExpenseParser.parse(latestMsg.text) : null;
                         
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.xs),
-                          leading: CircleAvatar(
-                            backgroundColor: conv.avatarColor,
-                            child: Text(
-                              conv.senderName.substring(0, 1).toUpperCase(),
-                              style: AppTypography.headlineMd.copyWith(color: Colors.white),
-                            ),
+                        return Dismissible(
+                          key: Key(conv.id),
+                          background: Container(
+                            color: AppColors.primary,
+                            alignment: Alignment.centerLeft,
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                            child: const Icon(Icons.mark_email_read, color: Colors.white),
                           ),
-                          title: Text(
-                            conv.senderName,
-                            style: AppTypography.bodyLg.copyWith(
-                              fontWeight: hasUnread ? FontWeight.bold : FontWeight.w500,
-                              color: AppColors.onSurface,
-                            ),
+                          secondaryBackground: Container(
+                            color: AppColors.errorRed,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                            child: const Icon(Icons.delete, color: Colors.white),
                           ),
-                          subtitle: Text(
-                            latestMsg?.text ?? '',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.bodyMd.copyWith(
-                              fontWeight: hasUnread ? FontWeight.bold : FontWeight.w400,
-                              color: hasUnread ? AppColors.onSurface : AppColors.onSurfaceVariant,
-                            ),
-                          ),
-                          trailing: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                latestMsg != null ? _formatTimestamp(latestMsg.timestamp) : '',
-                                style: AppTypography.labelMuted.copyWith(
-                                  color: hasUnread ? AppColors.smsPrimary : AppColors.outline,
-                                  fontWeight: hasUnread ? FontWeight.bold : FontWeight.w400,
-                                ),
-                              ),
-                              if (hasUnread) ...[
-                                const SizedBox(height: 4),
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.smsPrimary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text(
-                                    conv.unreadCount.toString(),
-                                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ]
-                            ],
-                          ),
-                          onTap: () {
-                            _smsService.markAsRead(conv.id);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => ConversationViewScreen(conversation: conv)),
-                            );
+                          confirmDismiss: (direction) async {
+                            if (direction == DismissDirection.startToEnd) {
+                              if (conv.unreadCount > 0) _smsService.markAsRead(conv.id);
+                              return false;
+                            }
+                            return true;
                           },
-                        );
+                          onDismissed: (direction) {
+                            if (direction == DismissDirection.endToStart) {
+                              _smsService.deleteConversation(conv.id);
+                            }
+                          },
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.xs),
+                            leading: CircleAvatar(
+                              backgroundColor: conv.avatarColor,
+                              child: Text(
+                                conv.senderName.substring(0, 1).toUpperCase(),
+                                style: AppTypography.headlineMd.copyWith(color: Colors.white),
+                              ),
+                            ),
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    conv.senderName,
+                                    style: AppTypography.bodyLg.copyWith(
+                                      fontWeight: hasUnread ? FontWeight.bold : FontWeight.w500,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                ),
+                                if (conv.isPinned) const Icon(Icons.push_pin, size: 16, color: AppColors.outline),
+                              ],
+                            ),
+                            subtitle: Row(
+                              children: [
+                                if (parsed != null) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    decoration: BoxDecoration(color: AppColors.errorRed.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                                    child: Text('₹${parsed.amount.toStringAsFixed(0)}', style: AppTypography.labelMuted.copyWith(color: AppColors.errorRed, fontWeight: FontWeight.bold)),
+                                  ),
+                                  const SizedBox(width: AppSpacing.xs),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    latestMsg?.text ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTypography.bodyMd.copyWith(
+                                      fontWeight: hasUnread ? FontWeight.bold : FontWeight.w400,
+                                      color: hasUnread ? AppColors.onSurface : AppColors.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (conv.isMuted) ...[
+                                      const Icon(Icons.notifications_off, size: 14, color: AppColors.outline),
+                                      const SizedBox(width: 4),
+                                    ],
+                                    Text(
+                                      latestMsg != null ? _formatTimestamp(latestMsg.timestamp) : '',
+                                      style: AppTypography.labelMuted.copyWith(
+                                        color: hasUnread ? AppColors.smsPrimary : AppColors.outline,
+                                        fontWeight: hasUnread ? FontWeight.bold : FontWeight.w400,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (hasUnread) ...[
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.smsPrimary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Text(
+                                      conv.unreadCount.toString(),
+                                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ]
+                              ],
+                            ),
+                            onLongPress: () => _showConversationOptions(context, conv),
+                            onTap: () {
+                              _smsService.markAsRead(conv.id);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => ConversationViewScreen(conversation: conv)),
+                              );
+                            },
+                          ),
+                        ).animate().fadeIn(duration: 200.ms).slideX(begin: 0.05);
                       },
                     ),
               ),
@@ -211,13 +406,13 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
         ),
         selected: isSelected,
         onSelected: (_) => _smsService.setFilter(filter),
-        selectedColor: AppColors.smsPrimary,
+        selectedColor: AppColors.primary,
         backgroundColor: AppColors.surfaceContainerLowest,
         showCheckmark: false,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.full),
           side: BorderSide(
-            color: isSelected ? AppColors.smsPrimary : AppColors.outlineVariant,
+            color: isSelected ? AppColors.primary : AppColors.outlineVariant,
           ),
         ),
       ),

@@ -7,6 +7,7 @@ class Transaction {
   final DateTime date;
   final String category;
   final String? subtitle;
+  final String? rawMessage;
   final TransactionType type;
 
   Transaction({
@@ -16,6 +17,7 @@ class Transaction {
     required this.date,
     required this.category,
     this.subtitle,
+    this.rawMessage,
     required this.type,
   });
 }

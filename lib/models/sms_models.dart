@@ -18,12 +18,17 @@ class Message {
 
 class Conversation {
   final String id;
-  final String senderName;
+  String senderName;
   final String senderNumber;
   final Color avatarColor;
   final List<Message> messages;
   int unreadCount;
   final bool isBankSender;
+  bool isDeleted;
+  DateTime? deletedAt;
+  bool isMuted;
+  bool isBlocked;
+  bool isPinned;
 
   Conversation({
     required this.id,
@@ -33,6 +38,11 @@ class Conversation {
     required this.messages,
     this.unreadCount = 0,
     this.isBankSender = false,
+    this.isDeleted = false,
+    this.deletedAt,
+    this.isMuted = false,
+    this.isBlocked = false,
+    this.isPinned = false,
   });
 
   Message? get latestMessage => messages.isNotEmpty ? messages.last : null;

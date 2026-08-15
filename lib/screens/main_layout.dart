@@ -17,8 +17,14 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
   
-  final List<Widget> _screens = [
-    const DashboardScreen(),
+  List<Widget> get _screens => [
+    DashboardScreen(
+      onSeeAllClicked: () {
+        setState(() {
+          _currentIndex = 1;
+        });
+      },
+    ),
     const TransactionsScreen(),
     const MyAccountsScreen(),
     const SmsInboxScreen(),

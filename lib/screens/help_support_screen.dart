@@ -1,0 +1,184 @@
+import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_spacing.dart';
+import '../theme/app_typography.dart';
+
+class HelpSupportScreen extends StatelessWidget {
+  const HelpSupportScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text('Help & Support', style: AppTypography.headlineMd),
+        centerTitle: true,
+        backgroundColor: AppColors.background,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.containerMargin),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Search Bar
+            TextField(
+              decoration: InputDecoration(
+                hintText: 'Search help articles...',
+                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                prefixIcon: const Icon(Icons.search, color: AppColors.outline),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                filled: true,
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // FAQ Section
+            Text('Frequently Asked Questions', style: AppTypography.headlineMd.copyWith(fontSize: 18)),
+            const SizedBox(height: AppSpacing.md),
+            
+            _buildFaqItem('How to link accounts?'),
+            _buildFaqItem('Is my data secure?'),
+            _buildFaqItem('Troubleshooting SMS parsing'),
+            _buildFaqItem('Resetting PIN'),
+            
+            const SizedBox(height: AppSpacing.lg),
+
+            // Contact Support Card
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.surfaceContainerHigh),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Contact Support', style: AppTypography.headlineMd.copyWith(fontSize: 18)),
+                  const SizedBox(height: AppSpacing.md),
+                  
+                  _buildTextFieldLabel('Name'),
+                  const SizedBox(height: AppSpacing.xs),
+                  _buildTextField('John Doe'),
+                  const SizedBox(height: AppSpacing.sm),
+                  
+                  _buildTextFieldLabel('Email Address'),
+                  const SizedBox(height: AppSpacing.xs),
+                  _buildTextField('john@example.com'),
+                  const SizedBox(height: AppSpacing.sm),
+                  
+                  _buildTextFieldLabel('Message'),
+                  const SizedBox(height: AppSpacing.xs),
+                  _buildTextField('Describe your issue...', maxLines: 4),
+                  const SizedBox(height: AppSpacing.lg),
+                  
+                  ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.send, color: AppColors.onPrimary, size: 18),
+                    label: Text('Send Message', style: AppTypography.bodyLg.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      minimumSize: const Size.fromHeight(50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: AppSpacing.xl),
+            
+            // View on GitHub button
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.code, size: 18, color: AppColors.onSurfaceVariant),
+                label: Text('View on GitHub', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppColors.surfaceContainerHigh),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFaqItem(String title) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
+      ),
+      child: Theme(
+        data: ThemeData(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          title: Text(title, style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
+          iconColor: AppColors.onSurfaceVariant,
+          collapsedIconColor: AppColors.onSurfaceVariant,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
+              child: Text(
+                'This is a placeholder answer for the frequently asked question.',
+                style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildTextFieldLabel(String label) {
+    return Text(
+      label,
+      style: AppTypography.labelCaps.copyWith(color: AppColors.primaryContainer, fontWeight: FontWeight.bold),
+    );
+  }
+  
+  Widget _buildTextField(String hint, {int maxLines = 1}) {
+    return TextField(
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+        filled: true,
+        fillColor: AppColors.surfaceBright,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: AppColors.primary),
+        ),
+      ),
+    );
+  }
+}

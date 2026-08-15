@@ -3,6 +3,7 @@ import '../services/mock_sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'conversation_view_screen.dart';
 
 class NewMessageScreen extends StatefulWidget {
   const NewMessageScreen({super.key});
@@ -44,8 +45,11 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
 
   void _sendMessage() {
     if (_canSend) {
-      _smsService.createNewConversation(_toController.text.trim(), _messageController.text.trim());
+      final conv = _smsService.startOrSendToNumber(_toController.text.trim(), _messageController.text.trim());
       Navigator.pop(context);
+      if (conv != null) {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => ConversationViewScreen(conversation: conv)));
+      }
     }
   }
 
