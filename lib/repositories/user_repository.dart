@@ -50,7 +50,10 @@ class UserRepository {
   }
 
   Future<void> updateUserName(String name) async {
-    // Mock update logic
-    await Future.delayed(const Duration(milliseconds: 300));
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    await updateProfile(user.uid, {'displayName': name});
+    // Also update Firebase Auth profile
+    await user.updateDisplayName(name);
   }
 }
