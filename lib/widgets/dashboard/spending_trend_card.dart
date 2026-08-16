@@ -25,6 +25,30 @@ class SpendingTrendCard extends StatefulWidget {
 class _SpendingTrendCardState extends State<SpendingTrendCard> {
   TrendPeriod _selectedTrendPeriod = TrendPeriod.month;
   DateTimeRange? _customDateRange;
+  late List<TrendData> _trendData;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateTrendData();
+  }
+
+  @override
+  void didUpdateWidget(covariant SpendingTrendCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.transactions != oldWidget.transactions) {
+      _calculateTrendData();
+    }
+  }
+
+  void _calculateTrendData() {
+    _trendData = widget.analyticsService.calculateTrendData(
+      widget.transactions, 
+      _selectedTrendPeriod, 
+      DateTime.now(), 
+      _customDateRange,
+    );
+  }
 
   String _getFilterName(TrendPeriod period) {
     switch (period) {
@@ -39,13 +63,6 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
   @override
   Widget build(BuildContext context) {
     final filters = TrendPeriod.values;
-    
-    final trendData = widget.analyticsService.calculateTrendData(
-      widget.transactions, 
-      _selectedTrendPeriod, 
-      DateTime.now(), 
-      _customDateRange,
-    );
 
     return Container(
       width: double.infinity,
@@ -95,11 +112,13 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
                           setState(() {
                             _customDateRange = picked;
                             _selectedTrendPeriod = filter;
+                            _calculateTrendData();
                           });
                         }
                       } else {
                         setState(() {
                           _selectedTrendPeriod = filter;
+                          _calculateTrendData();
                         });
                       }
                     },
@@ -127,7 +146,7 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
             height: 150,
             child: CustomPaint(
               painter: TrendChartPainter(
-                dataPoints: trendData,
+                dataPoints: _trendData,
               ),
               size: const Size(double.infinity, 150),
             ),

@@ -18,6 +18,15 @@ class MockTransactionRepository implements TransactionRepository {
     transactions[transaction.id] = transaction;
     return transaction.id;
   }
+
+  @override
+  Future<bool> addTransactionIfAbsent(model_tx.Transaction transaction) async {
+    if (transactions.containsKey(transaction.id)) {
+      return false;
+    }
+    transactions[transaction.id] = transaction;
+    return true;
+  }
   
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

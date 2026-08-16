@@ -6,13 +6,14 @@ import '../services/sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../utils/expense_parser.dart';
 import 'conversation_view_screen.dart';
 import 'new_message_screen.dart';
 import 'messages_settings_screen.dart';
 import 'bin_screen.dart';
+import 'compose_sms_screen.dart';
 import '../services/sms_transaction_importer.dart';
 import '../repositories/transaction_repository.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class SmsInboxScreen extends StatefulWidget {
   const SmsInboxScreen({super.key});
@@ -25,10 +26,37 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
   final SmsService _smsService = SmsService();
   final TextEditingController _searchController = TextEditingController();
   bool _isSyncing = false;
+  PermissionStatus? _smsPermissionStatus;
 
   @override
   void initState() {
     super.initState();
+    _checkPermission();
+  }
+
+  Future<void> _checkPermission() async {
+    final status = await Permission.sms.status;
+    setState(() {
+      _smsPermissionStatus = status;
+    });
+    if (status.isGranted) {
+      _smsService.loadDeviceSms();
+    }
+  }
+
+  Future<void> _requestPermission() async {
+    if (_smsPermissionStatus == PermissionStatus.permanentlyDenied) {
+      await openAppSettings();
+      return;
+    }
+    
+    final status = await Permission.sms.request();
+    setState(() {
+      _smsPermissionStatus = status;
+    });
+    if (status.isGranted) {
+      _smsService.loadDeviceSms();
+    }
   }
 
   @override
@@ -156,6 +184,53 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
     }
   }
 
+  Widget _buildPermissionUI() {
+    if (_smsPermissionStatus == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    
+    final isPermanentlyDenied = _smsPermissionStatus == PermissionStatus.permanentlyDenied;
+    
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.xl),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.sms_failed_outlined, size: 64, color: AppColors.outline),
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              'SMS Access Required',
+              style: AppTypography.headlineMd,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              isPermanentlyDenied 
+                ? 'SMS permission has been permanently denied. Please open Android settings to grant MoneyTrack access to read SMS.'
+                : 'MoneyTrack needs SMS access to automatically read bank transactions and track your expenses.',
+              textAlign: TextAlign.center,
+              style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            ElevatedButton(
+              onPressed: _requestPermission,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryContainer,
+                foregroundColor: AppColors.onPrimaryContainer,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.full)),
+              ),
+              child: Text(
+                isPermanentlyDenied ? 'Open Settings' : 'Allow SMS Access',
+                style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -182,7 +257,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
                 ),
               ),
             )
-          else
+          else if (_smsPermissionStatus == PermissionStatus.granted)
             IconButton(
               icon: const Icon(Icons.sync, color: AppColors.primaryContainer),
               onPressed: _syncTransactions,
@@ -260,7 +335,9 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
           ),
         ],
       ),
-      body: ListenableBuilder(
+      body: _smsPermissionStatus != PermissionStatus.granted
+        ? _buildPermissionUI()
+        : ListenableBuilder(
         listenable: _smsService,
         builder: (context, _) {
           final conversations = _smsService.filteredConversations;
@@ -311,7 +388,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
                         final conv = conversations[index];
                         final bool hasUnread = conv.unreadCount > 0;
                         final latestMsg = conv.latestMessage;
-                        final parsed = latestMsg != null ? ExpenseParser.parse(latestMsg.text) : null;
+                        final parsed = conv.latestParsedExpense;
                         
                         return Dismissible(
                           key: Key(conv.id),
@@ -437,6 +514,16 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
             ],
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ComposeSmsScreen()),
+          );
+        },
+        backgroundColor: AppColors.primaryContainer,
+        child: const Icon(Icons.message, color: AppColors.onPrimary),
       ),
     );
   }

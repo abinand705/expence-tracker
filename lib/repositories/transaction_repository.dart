@@ -49,6 +49,24 @@ class TransactionRepository {
     return docRef.id;
   }
 
+  Future<bool> addTransactionIfAbsent(model.Transaction transaction) async {
+    final docRef = _transactionsRef.doc(transaction.id);
+    
+    return await _firestore.runTransaction((tx) async {
+      final doc = await tx.get(docRef);
+      if (doc.exists) {
+        return false;
+      }
+      
+      final data = transaction.toMap();
+      data['createdAt'] = FieldValue.serverTimestamp();
+      data['updatedAt'] = FieldValue.serverTimestamp();
+      
+      tx.set(docRef, data);
+      return true;
+    });
+  }
+
   Future<void> updateTransaction(model.Transaction transaction) async {
     final docRef = _transactionsRef.doc(transaction.id);
     

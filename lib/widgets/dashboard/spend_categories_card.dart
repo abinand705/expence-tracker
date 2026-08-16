@@ -6,7 +6,7 @@ import '../../theme/app_typography.dart';
 import '../../models/transaction.dart';
 import '../../services/analytics_service.dart';
 
-class SpendCategoriesCard extends StatelessWidget {
+class SpendCategoriesCard extends StatefulWidget {
   final List<Transaction> transactions;
   final AnalyticsService analyticsService;
 
@@ -17,18 +17,42 @@ class SpendCategoriesCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  State<SpendCategoriesCard> createState() => _SpendCategoriesCardState();
+}
+
+class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
+  late Map<String, double> _totals;
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateTotals();
+  }
+
+  @override
+  void didUpdateWidget(covariant SpendCategoriesCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.transactions != oldWidget.transactions) {
+      _calculateTotals();
+    }
+  }
+
+  void _calculateTotals() {
     final now = DateTime.now();
-    final Map<String, double> totals = analyticsService.calculateCategoryTotals(
-      transactions,
+    _totals = widget.analyticsService.calculateCategoryTotals(
+      widget.transactions,
       month: now.month,
       year: now.year,
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     
-    double food = totals['Food'] ?? 0;
-    double shopping = totals['Shopping'] ?? 0;
-    double bills = totals['Bills'] ?? 0;
-    double others = totals['Others'] ?? 0;
+    double food = _totals['Food'] ?? 0;
+    double shopping = _totals['Shopping'] ?? 0;
+    double bills = _totals['Bills'] ?? 0;
+    double others = _totals['Others'] ?? 0;
 
     double total = food + shopping + bills + others;
     final displayTotal = total;

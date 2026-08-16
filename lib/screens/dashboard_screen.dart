@@ -43,12 +43,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLoading = true;
   String _userName = 'User';
   List<Transaction> _transactions = [];
-  List<Account> _accounts = [];
   Budget? _monthlyBudget;
   StreamSubscription<List<Transaction>>? _transactionSubscription;
   StreamSubscription<List<Account>>? _accountSubscription;
   StreamSubscription<List<Budget>>? _budgetSubscription;
   
+  // Cached analytics
+  double _totalBalance = 0.0;
+  double _currentMonthSpend = 0.0;
+  double _spendChange = 0.0;
+  List<Transaction> _recentTransactions = [];
+
   static bool _hasProcessedRecurring = false;
 
   @override
@@ -58,8 +63,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _transactionSubscription = _transactionRepo.watchTransactions().listen(
       (transactions) {
         if (mounted) {
+          final now = DateTime.now();
+          final lastMonth = now.month == 1 ? 12 : now.month - 1;
+          final lastMonthYear = now.month == 1 ? now.year - 1 : now.year;
+          
+          final currentSpend = _analyticsService.calculateTotalExpenses(transactions, month: now.month, year: now.year);
+          final lastSpend = _analyticsService.calculateTotalExpenses(transactions, month: lastMonth, year: lastMonthYear);
+          final change = lastSpend == 0 ? 0.0 : ((currentSpend - lastSpend) / lastSpend) * 100;
+          
           setState(() {
             _transactions = transactions;
+            _currentMonthSpend = currentSpend;
+            _spendChange = change;
+            _recentTransactions = transactions.take(3).toList();
           });
         }
       },
@@ -69,7 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (accounts) {
         if (mounted) {
           setState(() {
-            _accounts = accounts;
+            _totalBalance = accounts.fold(0.0, (sum, acc) => sum + acc.balance);
           });
         }
       },
@@ -159,20 +175,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       greeting = 'Good afternoon, $_userName';
     }
     
-    final totalBalance = _accounts.fold(0.0, (sum, acc) => sum + acc.balance);
-
-    final currentMonthSpend = _analyticsService.calculateTotalExpenses(_transactions, month: now.month, year: now.year);
-    
-    final lastMonth = now.month == 1 ? 12 : now.month - 1;
-    final lastMonthYear = now.month == 1 ? now.year - 1 : now.year;
-    final lastMonthSpend = _analyticsService.calculateTotalExpenses(_transactions, month: lastMonth, year: lastMonthYear);
-        
-    final spendChange = lastMonthSpend == 0 ? 0.0 : ((currentMonthSpend - lastMonthSpend) / lastMonthSpend) * 100;
-    
     final monthlyTarget = _monthlyBudget?.amount ?? 0.0;
-    final isWithinTarget = monthlyTarget == 0.0 ? true : currentMonthSpend <= monthlyTarget;
-
-    final recentTransactions = _transactions.take(3).toList();
+    final isWithinTarget = monthlyTarget == 0.0 ? true : _currentMonthSpend <= monthlyTarget;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -205,14 +209,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
-                    BalanceCard(totalBalance: totalBalance, formatter: currencyFormatter),
+                    BalanceCard(totalBalance: _totalBalance, formatter: currencyFormatter),
                     const SizedBox(height: AppSpacing.md),
                     Row(
                       children: [
                         Expanded(
                           child: MonthlySpendingCard(
-                            currentSpend: currentMonthSpend,
-                            spendChange: spendChange,
+                            currentSpend: _currentMonthSpend,
+                            spendChange: _spendChange,
                             formatter: currencyFormatter,
                             isWithinTarget: isWithinTarget,
                           ),
@@ -221,7 +225,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Expanded(
                           child: BudgetProgressCard(
                             target: monthlyTarget,
-                            currentSpend: currentMonthSpend,
+                            currentSpend: _currentMonthSpend,
                             formatter: currencyFormatter,
                             isWithinTarget: isWithinTarget,
                             onDoubleTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BudgetSettingsScreen())),
@@ -262,7 +266,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
-              sliver: recentTransactions.isEmpty
+              sliver: _recentTransactions.isEmpty
                 ? const SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.all(32.0),
@@ -272,9 +276,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 : SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        return TransactionCard(transaction: recentTransactions[index]);
+                        return TransactionCard(transaction: _recentTransactions[index]);
                       },
-                      childCount: recentTransactions.length,
+                      childCount: _recentTransactions.length,
                     ),
                   ),
             ),

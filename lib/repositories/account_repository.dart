@@ -90,6 +90,40 @@ class AccountRepository {
     return docRef.id;
   }
 
+  Future<bool> addAccountIfAbsent(Account account) async {
+    final collection = _accountsCollection;
+    if (collection == null) throw Exception('User not authenticated');
+
+    final docRef = collection.doc(account.id);
+    
+    return await _firestore.runTransaction((tx) async {
+      final doc = await tx.get(docRef);
+      if (doc.exists) {
+        debugPrint('[AccountRepository] account already exists for uid: ${_auth.currentUser?.uid.substring(0, 5)}... ($docRef.id)');
+        return false;
+      }
+      
+      final newAccount = Account(
+        id: docRef.id,
+        name: account.name,
+        bankName: account.bankName,
+        accountNumber: account.accountNumber,
+        accountType: account.accountType,
+        balance: account.balance,
+        currency: account.currency,
+        accentColor: account.accentColor,
+        isAutoDiscovered: account.isAutoDiscovered,
+        createdAt: account.createdAt ?? DateTime.now(),
+        updatedAt: account.updatedAt ?? DateTime.now(),
+      );
+
+      tx.set(docRef, newAccount.toMap());
+      debugPrint('[AccountRepository] writing account for uid: ${_auth.currentUser?.uid.substring(0, 5)}...');
+      debugPrint('[AccountRepository] account write successful: ${docRef.id}');
+      return true;
+    });
+  }
+
   Future<void> updateAccount(Account account) async {
     final collection = _accountsCollection;
     if (collection == null) throw Exception('User not authenticated');

@@ -43,15 +43,6 @@ class SmsTransactionImporter {
       final fingerprint = digest.toString();
       final deterministicId = 'sms_$fingerprint';
 
-      // Duplicate prevention: Check if exists.
-      // Note: TransactionRepository.addTransaction(tx) uses _transactionsRef.doc(tx.id).set()
-      // This naturally overwrites. To accurately report "duplicate" without relying solely on get(),
-      // we check existence. Since this runs sequentially per user, this is safe enough for client-side import.
-      final existing = await transactionRepo.getTransactionById(deterministicId);
-      if (existing != null) {
-        return SmsImportResult.duplicate;
-      }
-
       // Convert to Transaction
       final transaction = model_tx.Transaction(
         id: deterministicId,
@@ -66,7 +57,12 @@ class SmsTransactionImporter {
         isManual: false,
       );
 
-      await transactionRepo.addTransaction(transaction);
+      // Duplicate prevention: Atomic check
+      final success = await transactionRepo.addTransactionIfAbsent(transaction);
+      if (!success) {
+        return SmsImportResult.duplicate;
+      }
+
       return SmsImportResult.imported;
     } catch (e) {
       return SmsImportResult.failed;

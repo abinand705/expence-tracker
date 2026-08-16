@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../utils/expense_parser.dart';
+import 'compose_sms_screen.dart';
 
 class ConversationViewScreen extends StatefulWidget {
   final Conversation conversation;
@@ -64,9 +65,18 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
 
   void _sendMessage() {
     if (_canSend) {
-      _smsService.sendMessage(widget.conversation.id, _messageController.text.trim());
+      final text = _messageController.text.trim();
       _messageController.clear();
-      Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ComposeSmsScreen(
+            initialRecipient: widget.conversation.senderNumber,
+            initialMessage: text,
+          ),
+        ),
+      );
     }
   }
 

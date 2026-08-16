@@ -10,6 +10,7 @@ class Account {
   final double balance;
   final String currency;
   final Color accentColor;
+  final bool isAutoDiscovered;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -22,6 +23,7 @@ class Account {
     required this.balance,
     this.currency = 'INR',
     required this.accentColor,
+    this.isAutoDiscovered = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -41,6 +43,7 @@ class Account {
       'balance': balance,
       'currency': currency,
       'accentColor': accentColor.toARGB32(),
+      'isAutoDiscovered': isAutoDiscovered,
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
@@ -63,6 +66,7 @@ class Account {
       balance: (map['balance'] as num).toDouble(),
       currency: map['currency'] ?? 'INR',
       accentColor: map['accentColor'] != null ? Color(map['accentColor']) : Colors.blue,
+      isAutoDiscovered: map['isAutoDiscovered'] ?? false,
       createdAt: parseDate(map['createdAt']),
       updatedAt: parseDate(map['updatedAt']),
     );

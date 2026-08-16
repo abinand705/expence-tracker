@@ -23,7 +23,7 @@ class ExpenseParser {
   static final RegExp _debitKeywords = RegExp(r'(debited|spent|paid|sent|deducted|\bdr\b|dr\.)', caseSensitive: false);
   static final RegExp _creditKeywords = RegExp(r'(credited|received|\bcr\b|cr\.)', caseSensitive: false);
   static final RegExp _balRegex = RegExp(r'(?:AvlBal|Bal stands|Avl Bal|Balance)[\s:a-zA-Z]*(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false);
-  static final RegExp _acRegex = RegExp(r'(?:a/c no\.|a/c\s|account\s|acct\s)(?:[xX\*]+)?(\d{4,})', caseSensitive: false);
+  static final RegExp _acRegex = RegExp(r'(?:(?:a/c|account|acct)\s*(?:no\.?|number)?\s*[-:]?\s*(?:ending(?:\s+in)?\s+)?(?:[xX\*\.]{2,}[-]*)?\s*|ending(?:\s+in)?\s+|[xX\*]{2,}[-]*\s*)(\d{4,})', caseSensitive: false);
 
   static ParsedExpense? parse(String text) {
     final isDebit = _debitKeywords.hasMatch(text);

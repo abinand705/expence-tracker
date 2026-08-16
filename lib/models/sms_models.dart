@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/expense_parser.dart';
 
 class Message {
   final String id;
@@ -29,6 +30,7 @@ class Conversation {
   bool isMuted;
   bool isBlocked;
   bool isPinned;
+  ParsedExpense? latestParsedExpense;
 
   Conversation({
     required this.id,
@@ -43,6 +45,7 @@ class Conversation {
     this.isMuted = false,
     this.isBlocked = false,
     this.isPinned = false,
+    this.latestParsedExpense,
   });
 
   Message? get latestMessage => messages.isNotEmpty ? messages.last : null;

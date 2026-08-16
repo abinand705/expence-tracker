@@ -40,25 +40,18 @@ class RecurringExpenseService {
 
         final transactionId = _generateDeterministicTransactionId(expense.id, currentOccurrence);
         
-        // Attempt atomic/safe write:
-        // We fetch by id directly via transaction repository or just blindly catch failure.
-        // Easiest idempotent safe mechanism is to just try fetching it.
-        final existingTx = await _transactionRepo.getTransactionById(transactionId);
-        
-        if (existingTx == null) {
-          final tx = model_tx.Transaction(
-            id: transactionId,
-            amount: expense.amount,
-            type: model_tx.TransactionType.expense,
-            merchant: expense.title,
-            category: expense.category,
-            accountId: expense.accountId,
-            date: currentOccurrence,
-            isRecurring: true,
-          );
+        final tx = model_tx.Transaction(
+          id: transactionId,
+          amount: expense.amount,
+          type: model_tx.TransactionType.expense,
+          merchant: expense.title,
+          category: expense.category,
+          accountId: expense.accountId,
+          date: currentOccurrence,
+          isRecurring: true,
+        );
 
-          await _transactionRepo.addTransaction(tx);
-        }
+        await _transactionRepo.addTransactionIfAbsent(tx);
 
         // Calculate next occurrence regardless of whether it already existed (self-healing iteration)
         currentOccurrence = _calculateNextOccurrence(currentOccurrence, expense.frequency);

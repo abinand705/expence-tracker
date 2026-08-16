@@ -5,6 +5,9 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/sms_models.dart';
 import '../models/message_settings.dart';
+import 'package:flutter_sms_inbox/flutter_sms_inbox.dart' as inbox;
+import '../services/bank_detection_service.dart';
+import '../utils/expense_parser.dart';
 
 
 
@@ -143,6 +146,102 @@ class SmsService extends ChangeNotifier {
         if (changed) notifyListeners();
       }
     } catch (_) {}
+  }
+
+  Future<void> loadDeviceSms() async {
+    debugPrint('[SmsService] loadDeviceSms START');
+    final status = await Permission.sms.status;
+    if (!status.isGranted) {
+      debugPrint('[SmsService] SMS permission not granted');
+      return;
+    }
+
+    try {
+      final query = inbox.SmsQuery();
+      final messages = await query.querySms(
+        kinds: [inbox.SmsQueryKind.inbox],
+        sort: true,
+      );
+      
+      debugPrint('[SmsService] device SMS loaded: ${messages.length} messages');
+
+      final Map<String, List<Message>> convMap = {};
+      
+      for (var sms in messages) {
+        final address = sms.address ?? 'Unknown';
+        final body = sms.body ?? '';
+        final date = sms.date ?? DateTime.now();
+        
+        final msg = Message(
+          id: sms.id?.toString() ?? date.millisecondsSinceEpoch.toString(),
+          text: body,
+          timestamp: date,
+          isMe: false,
+        );
+        
+        if (!convMap.containsKey(address)) {
+          convMap[address] = [];
+        }
+        convMap[address]!.add(msg);
+      }
+      
+      _conversations.clear();
+      
+      final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal];
+      int colorIndex = 0;
+      final bankDetectionService = BankDetectionService();
+      
+      for (var entry in convMap.entries) {
+        final address = entry.key;
+        final msgs = entry.value;
+        
+        // sort messages by date ascending (oldest first for latestMessage logic)
+        msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+        
+        // simple bank heuristic (ExpenseParser handles deep filtering)
+        final isBank = RegExp(r'^[a-zA-Z]{2}-?[a-zA-Z0-9]{4,8}$').hasMatch(address) || address.toLowerCase().contains('bank');
+        
+        final conv = Conversation(
+          id: address,
+          senderName: address,
+          senderNumber: address,
+          avatarColor: colors[colorIndex % colors.length],
+          messages: msgs,
+          isBankSender: isBank,
+        );
+
+        if (isBank) {
+          final latestMsg = conv.latestMessage;
+          if (latestMsg != null) {
+            conv.latestParsedExpense = ExpenseParser.parse(latestMsg.text);
+          }
+          debugPrint('[SmsService] starting bank detection for sender: $address');
+          try {
+            // Process asynchronously to discover accounts without blocking UI completely
+            bankDetectionService.processMessagesForDiscovery(msgs, address).then((_) {
+              debugPrint('[SmsService] bank detection completed for sender: $address');
+            }).catchError((e) {
+              debugPrint('[SmsService] bank detection failed: $e');
+            });
+          } catch (e) {
+            debugPrint('[SmsService] bank detection failed: $e');
+          }
+        }
+
+        _conversations.add(conv);
+        colorIndex++;
+      }
+      
+      
+      debugPrint('[SmsService] conversations created: ${_conversations.length}');
+      
+      _applyAutoDelete();
+      await _loadContacts();
+      notifyListeners();
+      
+    } catch (e) {
+      debugPrint('[SmsService] loadDeviceSms failed: $e');
+    }
   }
 
   void _applyAutoDelete() {
