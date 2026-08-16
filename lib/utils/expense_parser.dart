@@ -90,7 +90,12 @@ class ExpenseParser {
 
   static String? extractAccountNumber(String text) {
     final acMatch = _acRegex.firstMatch(text);
-    if (acMatch != null) return acMatch.group(1);
+    if (acMatch != null) {
+      final digits = acMatch.group(1)?.replaceAll(RegExp(r'[^0-9]'), '');
+      if (digits != null && digits.length >= 4) {
+        return digits.substring(digits.length - 4);
+      }
+    }
     return null;
   }
 

@@ -124,6 +124,28 @@ class AccountRepository {
     });
   }
 
+  Future<void> cleanupLegacyAutoDiscoveredAccounts(String canonicalAccountId, String bankId, String last4) async {
+    final collection = _accountsCollection;
+    if (collection == null) return;
+
+    final snapshot = await collection
+        .where('isAutoDiscovered', isEqualTo: true)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      final docId = doc.id;
+      // Skip the canonical one
+      if (docId == canonicalAccountId) continue;
+
+      // Check if it's a legacy version of the same bank and ending with the same last4
+      if (docId.startsWith('${bankId}_') && docId.endsWith(last4)) {
+        // e.g. kgbank_80544 ends with 0544
+        debugPrint('[AccountRepository] cleaning up legacy duplicate account: $docId (canonical: $canonicalAccountId)');
+        await doc.reference.delete();
+      }
+    }
+  }
+
   Future<void> updateAccount(Account account) async {
     final collection = _accountsCollection;
     if (collection == null) throw Exception('User not authenticated');

@@ -191,6 +191,9 @@ class SmsService extends ChangeNotifier {
       int colorIndex = 0;
       final bankDetectionService = BankDetectionService();
       
+      final Map<String, List<Message>> allBankMessages = {};
+      int excludedFinancialCount = 0;
+      
       for (var entry in convMap.entries) {
         final address = entry.key;
         final msgs = entry.value;
@@ -199,7 +202,8 @@ class SmsService extends ChangeNotifier {
         msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         
         // simple bank heuristic (ExpenseParser handles deep filtering)
-        final isBank = RegExp(r'^[a-zA-Z]{2}-?[a-zA-Z0-9]{4,8}$').hasMatch(address) || address.toLowerCase().contains('bank');
+        // We expand the regex to support longer sender IDs with multiple hyphens (e.g., JD-BOBSMS-S)
+        final isBank = RegExp(r'^[a-zA-Z]{2}-?[a-zA-Z0-9\-]{4,12}$').hasMatch(address) || address.toLowerCase().contains('bank');
         
         final conv = Conversation(
           id: address,
@@ -215,16 +219,18 @@ class SmsService extends ChangeNotifier {
           if (latestMsg != null) {
             conv.latestParsedExpense = ExpenseParser.parse(latestMsg.text);
           }
-          debugPrint('[SmsService] starting bank detection for sender: $address');
-          try {
-            // Process asynchronously to discover accounts without blocking UI completely
-            bankDetectionService.processMessagesForDiscovery(msgs, address).then((_) {
-              debugPrint('[SmsService] bank detection completed for sender: $address');
-            }).catchError((e) {
-              debugPrint('[SmsService] bank detection failed: $e');
-            });
-          } catch (e) {
-            debugPrint('[SmsService] bank detection failed: $e');
+          allBankMessages[address] = msgs;
+        } else {
+          // Diagnostic: check if this conversation contains financial messages despite not matching isBank
+          bool hasFinancial = false;
+          for (final msg in msgs) {
+            if (ExpenseParser.parse(msg.text) != null) {
+              hasFinancial = true;
+              excludedFinancialCount++;
+            }
+          }
+          if (hasFinancial) {
+            debugPrint('[SmsService] excluded financial-looking sender: $address');
           }
         }
 
@@ -232,8 +238,24 @@ class SmsService extends ChangeNotifier {
         colorIndex++;
       }
       
-      
+      debugPrint('[SmsService] total SMS: ${messages.length}');
       debugPrint('[SmsService] conversations created: ${_conversations.length}');
+      
+      if (allBankMessages.isNotEmpty) {
+        int totalBankMessages = allBankMessages.values.fold(0, (sum, msgs) => sum + msgs.length);
+        debugPrint('[SmsService] financial messages selected: $totalBankMessages');
+        debugPrint('[SmsService] excluded financial-looking messages: $excludedFinancialCount');
+        try {
+          // Process asynchronously to discover accounts without blocking UI completely
+          bankDetectionService.processAllMessagesForDiscovery(allBankMessages).then((_) {
+            debugPrint('[SmsService] bank discovery completed');
+          }).catchError((e) {
+            debugPrint('[SmsService] bank discovery failed: $e');
+          });
+        } catch (e) {
+          debugPrint('[SmsService] bank discovery failed: $e');
+        }
+      }
       
       _applyAutoDelete();
       await _loadContacts();

@@ -8,9 +8,11 @@ class Transaction {
   final TransactionType type;
   final String merchant;
   final String category;
+  final String? description;
+  final String? accountId;
+  final String transactionSource;
   final String? subcategory;
   final DateTime date;
-  final String? accountId;
   final String? paymentMethod;
   final String? upiReference;
   final String? accountNumber;
@@ -29,9 +31,11 @@ class Transaction {
     required this.type,
     required this.merchant,
     required this.category,
+    this.description,
+    this.accountId,
+    this.transactionSource = 'manual',
     this.subcategory,
     required this.date,
-    this.accountId,
     this.paymentMethod,
     this.upiReference,
     this.accountNumber,
@@ -52,9 +56,11 @@ class Transaction {
       'type': type.name,
       'merchant': merchant,
       'category': category,
+      'description': description,
+      'accountId': accountId,
+      'transactionSource': transactionSource,
       'subcategory': subcategory,
       'date': Timestamp.fromDate(date),
-      'accountId': accountId,
       'paymentMethod': paymentMethod,
       'upiReference': upiReference,
       'accountNumber': accountNumber,
@@ -82,9 +88,11 @@ class Transaction {
       type: map['type'] == 'income' ? TransactionType.income : TransactionType.expense,
       merchant: map['merchant'],
       category: map['category'],
+      description: map['description'] ?? '',
+      accountId: map['accountId'] ?? '',
+      transactionSource: map['transactionSource'] ?? 'manual',
       subcategory: map['subcategory'],
       date: parseDate(map['date']),
-      accountId: map['accountId'],
       paymentMethod: map['paymentMethod'],
       upiReference: map['upiReference'],
       accountNumber: map['accountNumber'],

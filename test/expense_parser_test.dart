@@ -36,9 +36,12 @@ void main() {
       expect(result.type, TransactionType.expense);
     });
 
-    test('extracts account number', () {
-      final ac = ExpenseParser.extractAccountNumber('Acct XXXX1234 debited');
-      expect(ac, '1234');
+    test('extracts account number and normalizes to last 4 digits', () {
+      expect(ExpenseParser.extractAccountNumber('Acct XXXX1234 debited'), '1234');
+      expect(ExpenseParser.extractAccountNumber('Acct 80544 debited'), '0544');
+      expect(ExpenseParser.extractAccountNumber('Acct 12344 debited'), '2344');
+      expect(ExpenseParser.extractAccountNumber('ending in 1234'), '1234');
+      expect(ExpenseParser.extractAccountNumber('Acct 001234'), '1234');
     });
 
     test('guesses category', () {

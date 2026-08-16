@@ -85,7 +85,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (accounts) {
         if (mounted) {
           setState(() {
-            _totalBalance = accounts.fold(0.0, (sum, acc) => sum + acc.balance);
+            _totalBalance = accounts.fold(0.0, (sum, acc) => sum + acc.currentBalance);
           });
         }
       },

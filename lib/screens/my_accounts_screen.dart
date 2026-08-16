@@ -6,6 +6,8 @@ import '../models/account.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../services/bank_statement_service.dart';
+import 'import_statement_preview_screen.dart';
 
 class MyAccountsScreen extends StatefulWidget {
   const MyAccountsScreen({super.key});
@@ -69,7 +71,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       );
     }
 
-    final totalNetWorth = _accounts.fold(0.0, (sum, acc) => sum + acc.balance);
+    final totalNetWorth = _accounts.fold(0.0, (sum, acc) => sum + acc.currentBalance);
     final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
 
     return Scaffold(
@@ -117,7 +119,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                           bankName: acc.bankName,
                           accountType: acc.accountType,
                           accountNumber: acc.maskedAccountNumber,
-                          balance: currencyFormatter.format(acc.balance),
+                          balance: currencyFormatter.format(acc.currentBalance),
                           accentColor: acc.accentColor,
                           icon: Icons.account_balance,
                         ),
@@ -379,6 +381,14 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                   },
                 ),
                 ListTile(
+                  leading: const Icon(Icons.file_upload, color: AppColors.primary),
+                  title: const Text('Import Bank Statement'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _handleImportStatement(context, account);
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.delete, color: AppColors.errorRed),
                   title: const Text('Delete Account', style: TextStyle(color: AppColors.errorRed)),
                   onTap: () async {
@@ -523,6 +533,44 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         );
       },
     );
+  }
+
+  Future<void> _handleImportStatement(BuildContext context, Account account) async {
+    try {
+      final service = BankStatementService();
+      final parsedStatement = await service.pickAndParseStatement(account);
+      
+      if (parsedStatement != null && context.mounted) {
+        // Show preview screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ImportStatementPreviewScreen(
+              account: account,
+              parsedStatement: parsedStatement,
+              fileName: 'Bank Statement',
+              fileType: 'document',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Import Failed'),
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 }
 

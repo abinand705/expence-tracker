@@ -6,8 +6,12 @@ class Account {
   final String name;
   final String bankName;
   final String accountNumber;
-  final String accountType;
-  final double balance;
+  final String accountType; // Savings, Current, Credit Card
+  final double balance; // Legacy fallback
+  final double currentBalance; // Authoritative balance
+  final String balanceSource; // 'sms', 'statement', 'manual'
+  final DateTime? balanceUpdatedAt;
+  final DateTime? lastStatementImportAt;
   final String currency;
   final Color accentColor;
   final bool isAutoDiscovered;
@@ -20,7 +24,11 @@ class Account {
     required this.bankName,
     required this.accountNumber,
     required this.accountType,
-    required this.balance,
+    this.balance = 0.0,
+    this.currentBalance = 0.0,
+    this.balanceSource = 'manual',
+    this.balanceUpdatedAt,
+    this.lastStatementImportAt,
     this.currency = 'INR',
     required this.accentColor,
     this.isAutoDiscovered = false,
@@ -41,6 +49,10 @@ class Account {
       'accountNumber': accountNumber,
       'accountType': accountType,
       'balance': balance,
+      'currentBalance': currentBalance,
+      'balanceSource': balanceSource,
+      'balanceUpdatedAt': balanceUpdatedAt != null ? Timestamp.fromDate(balanceUpdatedAt!) : null,
+      'lastStatementImportAt': lastStatementImportAt != null ? Timestamp.fromDate(lastStatementImportAt!) : null,
       'currency': currency,
       'accentColor': accentColor.toARGB32(),
       'isAutoDiscovered': isAutoDiscovered,
@@ -62,8 +74,12 @@ class Account {
       name: map['name'] ?? '',
       bankName: map['bankName'] ?? '',
       accountNumber: map['accountNumber'] ?? '',
-      accountType: map['accountType'] ?? '',
-      balance: (map['balance'] as num).toDouble(),
+      accountType: map['accountType'] ?? 'Savings',
+      balance: (map['balance'] as num?)?.toDouble() ?? 0.0,
+      currentBalance: (map['currentBalance'] as num?)?.toDouble() ?? (map['balance'] as num?)?.toDouble() ?? 0.0,
+      balanceSource: map['balanceSource'] ?? 'manual',
+      balanceUpdatedAt: map['balanceUpdatedAt'] != null ? (map['balanceUpdatedAt'] as Timestamp).toDate() : null,
+      lastStatementImportAt: map['lastStatementImportAt'] != null ? (map['lastStatementImportAt'] as Timestamp).toDate() : null,
       currency: map['currency'] ?? 'INR',
       accentColor: map['accentColor'] != null ? Color(map['accentColor']) : Colors.blue,
       isAutoDiscovered: map['isAutoDiscovered'] ?? false,
