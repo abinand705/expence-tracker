@@ -14,7 +14,6 @@ class TransactionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isIncome = transaction.type == TransactionType.income;
-    final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 0);
 
     return GestureDetector(
       onTap: () {

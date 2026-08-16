@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Account {
   final String id;
@@ -39,13 +40,20 @@ class Account {
       'accountType': accountType,
       'balance': balance,
       'currency': currency,
-      'accentColor': accentColor.value,
-      'createdAt': createdAt?.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      'accentColor': accentColor.toARGB32(),
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
   }
 
   factory Account.fromMap(Map<String, dynamic> map) {
+    DateTime? parseDate(dynamic val) {
+      if (val == null) return null;
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val);
+      return null;
+    }
+
     return Account(
       id: map['id'],
       name: map['name'] ?? '',
@@ -55,8 +63,8 @@ class Account {
       balance: (map['balance'] as num).toDouble(),
       currency: map['currency'] ?? 'INR',
       accentColor: map['accentColor'] != null ? Color(map['accentColor']) : Colors.blue,
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : null,
-      updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
+      createdAt: parseDate(map['createdAt']),
+      updatedAt: parseDate(map['updatedAt']),
     );
   }
 }

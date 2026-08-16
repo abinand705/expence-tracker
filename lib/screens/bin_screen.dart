@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/sms_models.dart';
 import '../services/sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -179,7 +178,7 @@ class _BinScreenState extends State<BinScreen> {
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.xs),
                         selected: isSelected,
-                        selectedTileColor: AppColors.primaryContainer.withOpacity(0.1),
+                        selectedTileColor: AppColors.primaryContainer.withValues(alpha: 0.1),
                         leading: _isSelectionMode
                             ? Checkbox(
                                 value: isSelected,
@@ -187,7 +186,7 @@ class _BinScreenState extends State<BinScreen> {
                                 activeColor: AppColors.primary,
                               )
                             : CircleAvatar(
-                                backgroundColor: conv.avatarColor.withOpacity(0.5),
+                                backgroundColor: conv.avatarColor.withValues(alpha: 0.5),
                                 child: Text(
                                   conv.senderName.substring(0, 1).toUpperCase(),
                                   style: AppTypography.headlineMd.copyWith(color: Colors.white),

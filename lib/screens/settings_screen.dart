@@ -3,7 +3,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../services/auth_service.dart';
-
+import 'budget_settings_screen.dart';
+import 'recurring_expenses_screen.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -23,6 +24,20 @@ class SettingsScreen extends StatelessWidget {
           _buildSettingsTile(Icons.dark_mode, 'Dark Mode', trailing: Switch(value: false, onChanged: (v) {})),
           _buildSettingsTile(Icons.notifications, 'Notifications', trailing: Switch(value: true, onChanged: (v) {})),
           _buildSettingsTile(Icons.security, 'Biometric Lock', trailing: Switch(value: false, onChanged: (v) {})),
+          _buildSettingsTile(
+            Icons.account_balance_wallet, 
+            'Budgets',
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const BudgetSettingsScreen()));
+            },
+          ),
+          _buildSettingsTile(
+            Icons.repeat, 
+            'Recurring Expenses',
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const RecurringExpensesScreen()));
+            },
+          ),
           const SizedBox(height: AppSpacing.lg),
           _buildSectionHeader('DATA'),
           _buildSettingsTile(Icons.backup, 'Backup & Restore'),

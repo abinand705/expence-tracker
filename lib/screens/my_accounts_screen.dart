@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../repositories/account_repository.dart';
@@ -17,24 +18,37 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   final AccountRepository _accountRepo = AccountRepository();
   List<Account> _accounts = [];
   bool _isLoading = true;
+  StreamSubscription<List<Account>>? _accountSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadAccounts();
+    _accountSubscription = _accountRepo.watchAccounts().listen(
+      (accounts) {
+        if (mounted) {
+          setState(() {
+            _accounts = accounts;
+            _isLoading = false;
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      },
+    );
   }
 
-  Future<void> _loadAccounts() async {
-    setState(() => _isLoading = true);
-    try {
-      final accounts = await _accountRepo.getAccounts();
-      setState(() {
-        _accounts = accounts;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+  @override
+  void dispose() {
+    _accountSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshAccounts() async {
+    // With stream, refresh just delays to give UI feedback
+    await Future.delayed(const Duration(milliseconds: 500));
   }
 
   @override
@@ -71,48 +85,52 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
       ),
-          body: RefreshIndicator(
-            onRefresh: _loadAccounts,
-            color: AppColors.primary,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
-                  const SizedBox(height: AppSpacing.md),
-                  _buildStatsCard(),
-                  const SizedBox(height: AppSpacing.xl),
-                  Text(
-                    'Linked Accounts',
-                    style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  if (_accounts.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      child: Text('No accounts found from messages.', style: AppTypography.bodyLg),
-                    )
-                  else
-                    ..._accounts.map((acc) => Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: _buildLinkedAccountCard(
-                            bankName: acc.bankName,
-                            accountType: acc.accountType,
-                            accountNumber: acc.maskedAccountNumber,
-                            balance: currencyFormatter.format(acc.balance),
-                            accentColor: acc.accentColor,
-                            icon: Icons.account_balance,
-                          ),
-                        )).toList(),
-                  const SizedBox(height: AppSpacing.lg),
-                  _buildLinkAnotherBankButton(context),
-                  const SizedBox(height: 100),
-                ],
+      body: RefreshIndicator(
+        onRefresh: _refreshAccounts,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
+              const SizedBox(height: AppSpacing.md),
+              _buildStatsCard(),
+              const SizedBox(height: AppSpacing.xl),
+              Text(
+                'Linked Accounts',
+                style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
               ),
-            ),
+              const SizedBox(height: AppSpacing.md),
+              if (_accounts.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Text('No accounts found. Link a bank account to track balances.', style: AppTypography.bodyLg),
+                )
+              else
+                ..._accounts.map((acc) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: InkWell(
+                        onTap: () => _showAccountOptionsModal(context, acc),
+                        borderRadius: BorderRadius.circular(12),
+                        child: _buildLinkedAccountCard(
+                          bankName: acc.bankName,
+                          accountType: acc.accountType,
+                          accountNumber: acc.maskedAccountNumber,
+                          balance: currencyFormatter.format(acc.balance),
+                          accentColor: acc.accentColor,
+                          icon: Icons.account_balance,
+                        ),
+                      ),
+                    )),
+              const SizedBox(height: AppSpacing.lg),
+              _buildLinkAnotherBankButton(context),
+              const SizedBox(height: 100),
+            ],
           ),
-        );
+        ),
+      ),
+    );
   }
 
   Widget _buildNetWorthCard(BuildContext context, NumberFormat formatter, double totalNetWorth) {
@@ -142,9 +160,9 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    _loadAccounts();
+                    _refreshAccounts();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Balances updated from recent messages.')),
+                      const SnackBar(content: Text('Balances updated.')),
                     );
                   },
                   icon: const Icon(Icons.sync, color: AppColors.onPrimary, size: 16),
@@ -336,78 +354,172 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  void _showAddAccountModal(BuildContext context) {
+  void _showAccountOptionsModal(BuildContext context, Account account) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceBright,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.outlineVariant, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: AppSpacing.lg),
+                Text(account.name, style: AppTypography.headlineMd),
+                const SizedBox(height: AppSpacing.lg),
+                ListTile(
+                  leading: const Icon(Icons.edit, color: AppColors.primaryContainer),
+                  title: const Text('Edit Account'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showAddAccountModal(context, accountToEdit: account);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete, color: AppColors.errorRed),
+                  title: const Text('Delete Account', style: TextStyle(color: AppColors.errorRed)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    try {
+                      await _accountRepo.deleteAccount(account.id);
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deleted')));
+                    } catch (e) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAddAccountModal(BuildContext context, {Account? accountToEdit}) {
+    final bankNameController = TextEditingController(text: accountToEdit?.bankName ?? '');
+    final accountNoController = TextEditingController(text: accountToEdit?.accountNumber ?? '');
+    final balanceController = TextEditingController(text: accountToEdit?.balance.toString() ?? '');
+    String accountType = accountToEdit?.accountType ?? 'Savings';
+    bool isSaving = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: AppColors.surfaceBright,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            top: AppSpacing.lg,
-            bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Add Manual Account', style: AppTypography.headlineMd),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Bank Name',
-                  border: OutlineInputBorder(),
-                ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: AppSpacing.lg,
+                right: AppSpacing.lg,
+                top: AppSpacing.lg,
+                bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
               ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                decoration: const InputDecoration(
-                  labelText: 'Account No (Last 4 digits)',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                maxLength: 4,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(accountToEdit == null ? 'Add Manual Account' : 'Edit Account', style: AppTypography.headlineMd),
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    controller: bankNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Bank Name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextField(
+                    controller: accountNoController,
+                    decoration: const InputDecoration(
+                      labelText: 'Account No (Last 4 digits)',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                    maxLength: 4,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  TextField(
+                    controller: balanceController,
+                    decoration: const InputDecoration(
+                      labelText: 'Balance',
+                      border: OutlineInputBorder(),
+                      prefixText: '₹ ',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  DropdownButtonFormField<String>(
+                    initialValue: ['Savings', 'Current', 'Credit Card', 'Loan'].contains(accountType) ? accountType : 'Savings',
+                    decoration: const InputDecoration(
+                      labelText: 'Account Type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: ['Savings', 'Current', 'Credit Card', 'Loan']
+                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) accountType = value;
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.xl),
+                  ElevatedButton(
+                    onPressed: isSaving ? null : () async {
+                      if (bankNameController.text.isEmpty || accountNoController.text.isEmpty || balanceController.text.isEmpty) {
+                        return;
+                      }
+
+                      setModalState(() => isSaving = true);
+                      
+                      try {
+                        final newAccount = Account(
+                          id: accountToEdit?.id ?? '',
+                          name: '${bankNameController.text} Account',
+                          bankName: bankNameController.text,
+                          accountNumber: accountNoController.text,
+                          accountType: accountType,
+                          balance: double.tryParse(balanceController.text) ?? 0.0,
+                          accentColor: accountToEdit?.accentColor ?? AppColors.primaryContainer,
+                          createdAt: accountToEdit?.createdAt ?? DateTime.now(),
+                        );
+
+                        if (accountToEdit == null) {
+                          await _accountRepo.addAccount(newAccount);
+                        } else {
+                          await _accountRepo.updateAccount(newAccount);
+                        }
+
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(accountToEdit == null ? 'Account added successfully.' : 'Account updated successfully.')),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                        }
+                      } finally {
+                        if (mounted) setModalState(() => isSaving = false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryContainer,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 50),
+                    ),
+                    child: isSaving ? const CircularProgressIndicator(color: Colors.white) : Text(accountToEdit == null ? 'Save Account' : 'Update Account'),
+                  ),
+                ],
               ),
-              const SizedBox(height: AppSpacing.sm),
-              DropdownButtonFormField<String>(
-                decoration: const InputDecoration(
-                  labelText: 'Account Type',
-                  border: OutlineInputBorder(),
-                ),
-                items: ['Savings', 'Current', 'Credit Card', 'Loan']
-                    .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                    .toList(),
-                onChanged: (value) {},
-              ),
-              const SizedBox(height: AppSpacing.md),
-              OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Upload Bank Statement (Optional)'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Account added successfully.')),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryContainer,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                child: const Text('Save Account'),
-              ),
-            ],
-          ),
+            );
+          }
         );
       },
     );

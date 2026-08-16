@@ -1,27 +1,38 @@
+import '../models/transaction.dart';
+
 class ParsedExpense {
   final double amount;
   final String? merchant;
   final String rawText;
   final double? availableBalance;
   final String? accountNumber;
+  final TransactionType type;
 
   ParsedExpense({
     required this.amount, 
     this.merchant, 
     this.availableBalance,
     this.accountNumber,
-    required this.rawText
+    required this.rawText,
+    this.type = TransactionType.expense,
   });
 }
 
 class ExpenseParser {
   static final RegExp _amountRegex = RegExp(r'(?:rs\.?|inr|₹)\s?([\d,]+(?:\.\d{1,2})?)', caseSensitive: false);
   static final RegExp _debitKeywords = RegExp(r'(debited|spent|paid|sent|deducted|\bdr\b|dr\.)', caseSensitive: false);
+  static final RegExp _creditKeywords = RegExp(r'(credited|received|\bcr\b|cr\.)', caseSensitive: false);
   static final RegExp _balRegex = RegExp(r'(?:AvlBal|Bal stands|Avl Bal|Balance)[\s:a-zA-Z]*(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false);
-  static final RegExp _acRegex = RegExp(r'(?:a/c no\.|a/c\s|account\s)(?:[xX\*]+)?(\d{4,})', caseSensitive: false);
+  static final RegExp _acRegex = RegExp(r'(?:a/c no\.|a/c\s|account\s|acct\s)(?:[xX\*]+)?(\d{4,})', caseSensitive: false);
 
   static ParsedExpense? parse(String text) {
-    if (!_debitKeywords.hasMatch(text)) return null;
+    final isDebit = _debitKeywords.hasMatch(text);
+    final isCredit = _creditKeywords.hasMatch(text);
+
+    if (!isDebit && !isCredit) return null;
+
+    // If both match, it's often a transfer. We'll default to expense if debit keyword is present.
+    final type = isDebit ? TransactionType.expense : TransactionType.income;
 
     final amountMatch = _amountRegex.firstMatch(text);
     if (amountMatch != null) {
@@ -31,7 +42,7 @@ class ExpenseParser {
         if (amount != null) {
           // Attempt to extract merchant after 'at', 'to', etc.
           String? merchant;
-          final merchantRegex = RegExp(r'(?:at|to|info)\s+([A-Za-z0-9\s@.-]+?)(?:\.|\s|on|$)', caseSensitive: false);
+          final merchantRegex = RegExp(r'(?:at|to|info)\s+([A-Za-z0-9\s@.-]+?)(?:\.|\s+on\s+|$)', caseSensitive: false);
           final merchantMatch = merchantRegex.firstMatch(text);
           if (merchantMatch != null) {
             merchant = merchantMatch.group(1)?.trim();
@@ -60,6 +71,7 @@ class ExpenseParser {
             availableBalance: availableBalance,
             accountNumber: accountNumber,
             rawText: text,
+            type: type,
           );
         }
       }

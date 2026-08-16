@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../repositories/transaction_repository.dart';
 import '../models/transaction.dart';
@@ -23,24 +24,37 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   
   List<Transaction> _allTransactions = [];
   bool _isLoading = true;
+  StreamSubscription<List<Transaction>>? _transactionSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadTransactions();
+    _transactionSubscription = _transactionRepo.watchTransactions().listen(
+      (transactions) {
+        if (mounted) {
+          setState(() {
+            _allTransactions = transactions;
+            _isLoading = false;
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _transactionSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadTransactions() async {
-    setState(() => _isLoading = true);
-    try {
-      final transactions = await _transactionRepo.getTransactions();
-      setState(() {
-        _allTransactions = transactions;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
+    // Kept for RefreshIndicator compatibility, stream handles actual data updates
+    await Future.delayed(const Duration(milliseconds: 300));
   }
 
   @override

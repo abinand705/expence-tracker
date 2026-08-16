@@ -11,6 +11,8 @@ import 'conversation_view_screen.dart';
 import 'new_message_screen.dart';
 import 'messages_settings_screen.dart';
 import 'bin_screen.dart';
+import '../services/sms_transaction_importer.dart';
+import '../repositories/transaction_repository.dart';
 
 class SmsInboxScreen extends StatefulWidget {
   const SmsInboxScreen({super.key});
@@ -22,14 +24,11 @@ class SmsInboxScreen extends StatefulWidget {
 class _SmsInboxScreenState extends State<SmsInboxScreen> {
   final SmsService _smsService = SmsService();
   final TextEditingController _searchController = TextEditingController();
+  bool _isSyncing = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize dummy data if not already done
-    if (_smsService.conversations.isEmpty) {
-      _smsService.initializeDummyData();
-    }
   }
 
   @override
@@ -124,6 +123,39 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
     );
   }
 
+  Future<void> _syncTransactions() async {
+    if (_isSyncing) return;
+    setState(() => _isSyncing = true);
+
+    try {
+      final repo = TransactionRepository();
+      final importer = SmsTransactionImporter(transactionRepo: repo);
+      final summary = await importer.importAllBankMessages(_smsService.conversations);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$summary'),
+          backgroundColor: AppColors.primaryContainer,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to sync transactions.'),
+          backgroundColor: AppColors.errorRed,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,6 +171,23 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
         backgroundColor: AppColors.background,
         elevation: 0,
         actions: [
+          if (_isSyncing)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.sync, color: AppColors.primaryContainer),
+              onPressed: _syncTransactions,
+              tooltip: 'Sync Transactions',
+            ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: AppColors.onSurface),
             color: AppColors.surfaceBright,
@@ -318,7 +367,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
                                 if (parsed != null) ...[
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                    decoration: BoxDecoration(color: AppColors.errorRed.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                                    decoration: BoxDecoration(color: AppColors.errorRed.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
                                     child: Text('₹${parsed.amount.toStringAsFixed(0)}', style: AppTypography.labelMuted.copyWith(color: AppColors.errorRed, fontWeight: FontWeight.bold)),
                                   ),
                                   const SizedBox(width: AppSpacing.xs),

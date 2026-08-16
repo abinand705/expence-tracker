@@ -532,7 +532,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                 icon: const Icon(Icons.add, size: 16, color: AppColors.onPrimaryContainer),
                 label: Text('Add ₹${parsed.amount.toStringAsFixed(0)} to Expenses', style: AppTypography.labelMuted.copyWith(fontWeight: FontWeight.bold, color: AppColors.onPrimaryContainer)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryContainer.withOpacity(0.15),
+                  backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.15),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

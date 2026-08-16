@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../theme/app_colors.dart';
@@ -10,6 +11,7 @@ import '../repositories/account_repository.dart';
 import '../repositories/budget_repository.dart';
 import '../repositories/user_repository.dart';
 import '../services/analytics_service.dart';
+import '../services/recurring_expense_service.dart';
 import '../models/transaction.dart';
 import '../models/account.dart';
 import '../models/budget.dart';
@@ -18,7 +20,7 @@ import '../widgets/dashboard/monthly_spending_card.dart';
 import '../widgets/dashboard/budget_progress_card.dart';
 import '../widgets/dashboard/spending_trend_card.dart';
 import '../widgets/dashboard/spend_categories_card.dart';
-
+import 'budget_settings_screen.dart';
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onSeeAllClicked;
 
@@ -43,75 +45,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Transaction> _transactions = [];
   List<Account> _accounts = [];
   Budget? _monthlyBudget;
+  StreamSubscription<List<Transaction>>? _transactionSubscription;
+  StreamSubscription<List<Account>>? _accountSubscription;
+  StreamSubscription<List<Budget>>? _budgetSubscription;
+  
+  static bool _hasProcessedRecurring = false;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _transactionSubscription = _transactionRepo.watchTransactions().listen(
+      (transactions) {
+        if (mounted) {
+          setState(() {
+            _transactions = transactions;
+          });
+        }
+      },
+      onError: (e) {}
+    );
+    _accountSubscription = _accountRepo.watchAccounts().listen(
+      (accounts) {
+        if (mounted) {
+          setState(() {
+            _accounts = accounts;
+          });
+        }
+      },
+      onError: (e) {}
+    );
+    _budgetSubscription = _budgetRepo.watchBudgets().listen(
+      (budgets) {
+        if (mounted) {
+          setState(() {
+            try {
+              _monthlyBudget = budgets.firstWhere((b) => b.category == 'Total');
+            } catch (e) {
+              _monthlyBudget = null; // No total budget found
+            }
+          });
+        }
+      },
+      onError: (e) {}
+    );
+  }
+
+  @override
+  void dispose() {
+    _transactionSubscription?.cancel();
+    _accountSubscription?.cancel();
+    _budgetSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    try {
-      final results = await Future.wait([
-        _userRepo.getUserName(),
-        _transactionRepo.getTransactions(),
-        _accountRepo.getAccounts(),
-        _budgetRepo.getMonthlyBudget(),
-      ]);
+    
+    if (!_hasProcessedRecurring) {
+      _hasProcessedRecurring = true;
+      try {
+        await RecurringExpenseService().processDueExpenses();
+      } catch (e) {
+        // Continue if it fails, don't crash dashboard
+      }
+    }
 
-      setState(() {
-        _userName = (results[0] as String?) ?? 'User';
-        _transactions = results[1] as List<Transaction>;
-        _accounts = results[2] as List<Account>;
-        _monthlyBudget = results[3] as Budget?;
-        _isLoading = false;
-      });
+    try {
+      final userName = await _userRepo.getUserName();
+      if (mounted) {
+        setState(() {
+          _userName = userName ?? 'User';
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      // Handle error visually if needed
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
-  void _showTargetModal(BuildContext context, double currentTarget) {
-    final controller = TextEditingController(text: currentTarget.toStringAsFixed(0));
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.surfaceBright,
-          title: Text('Set Monthly Target', style: AppTypography.headlineMd),
-          content: TextField(
-            controller: controller,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Target Amount',
-              prefixText: '₹ ',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: AppTypography.bodyLg),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final val = double.tryParse(controller.text);
-                if (val != null) {
-                  await _budgetRepo.setMonthlyBudget(val);
-                  _loadData();
-                }
-                if (mounted) Navigator.pop(context);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryContainer, foregroundColor: Colors.white),
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -139,8 +153,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final now = DateTime.now();
     final hour = now.hour;
     String greeting = 'Good evening, $_userName';
-    if (hour < 12) greeting = 'Good morning, $_userName';
-    else if (hour < 17) greeting = 'Good afternoon, $_userName';
+    if (hour < 12) {
+      greeting = 'Good morning, $_userName';
+    } else if (hour < 17) {
+      greeting = 'Good afternoon, $_userName';
+    }
     
     final totalBalance = _accounts.fold(0.0, (sum, acc) => sum + acc.balance);
 
@@ -152,8 +169,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         
     final spendChange = lastMonthSpend == 0 ? 0.0 : ((currentMonthSpend - lastMonthSpend) / lastMonthSpend) * 100;
     
-    final monthlyTarget = _monthlyBudget?.amount ?? 20000.0;
-    final isWithinTarget = currentMonthSpend <= monthlyTarget;
+    final monthlyTarget = _monthlyBudget?.amount ?? 0.0;
+    final isWithinTarget = monthlyTarget == 0.0 ? true : currentMonthSpend <= monthlyTarget;
 
     final recentTransactions = _transactions.take(3).toList();
 
@@ -207,7 +224,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             currentSpend: currentMonthSpend,
                             formatter: currencyFormatter,
                             isWithinTarget: isWithinTarget,
-                            onDoubleTap: () => _showTargetModal(context, monthlyTarget),
+                            onDoubleTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BudgetSettingsScreen())),
                           ),
                         ),
                       ],

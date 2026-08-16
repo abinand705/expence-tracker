@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class UserRepository {
   static final UserRepository _instance = UserRepository._internal();
@@ -30,6 +31,10 @@ class UserRepository {
     return doc.data();
   }
 
+  Stream<Map<String, dynamic>?> watchProfile(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots().map((doc) => doc.data());
+  }
+
   Future<void> updateProfile(String uid, Map<String, dynamic> data) async {
     final updateData = Map<String, dynamic>.from(data);
     updateData['updatedAt'] = FieldValue.serverTimestamp();
@@ -37,12 +42,11 @@ class UserRepository {
     await _firestore.collection('users').doc(uid).update(updateData);
   }
 
-  // Fallback methods for mock usages during migration phase
   Future<String?> getUserName() async {
-    // Attempt to get currently authenticated user profile
-    // But since this is a synchronous-ish wrapper, we can just return a fallback if no auth logic provided here
-    // We will rely on Auth flow. For now, if called directly:
-    return 'User';
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return 'User';
+    final profile = await getProfile(user.uid);
+    return profile?['displayName'] as String? ?? user.displayName ?? 'User';
   }
 
   Future<void> updateUserName(String name) async {

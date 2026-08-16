@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../repositories/user_repository.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
-import '../screens/my_accounts_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/help_support_screen.dart';
 import '../services/auth_service.dart';
@@ -22,23 +23,42 @@ class AppDrawer extends StatelessWidget {
               children: [
                 DrawerHeader(
                   decoration: const BoxDecoration(color: AppColors.primaryContainer),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.person, size: 36, color: AppColors.primaryContainer),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text('John Doe', style: AppTypography.headlineMd.copyWith(color: AppColors.onPrimary)),
-                      Text('+91 9876543210', style: AppTypography.bodyMd.copyWith(color: AppColors.onPrimary.withValues(alpha: 0.7))),
-                    ],
+                  child: StreamBuilder<Map<String, dynamic>?>(
+                    stream: FirebaseAuth.instance.currentUser != null 
+                        ? UserRepository().watchProfile(FirebaseAuth.instance.currentUser!.uid)
+                        : const Stream.empty(),
+                    builder: (context, snapshot) {
+                      final currentUser = FirebaseAuth.instance.currentUser;
+                      
+                      String displayName = 'Loading...';
+                      String email = '';
+                      
+                      if (snapshot.connectionState == ConnectionState.active || snapshot.connectionState == ConnectionState.done) {
+                        final data = snapshot.data;
+                        displayName = data?['displayName'] as String? ?? currentUser?.displayName ?? 'User';
+                        email = data?['email'] as String? ?? currentUser?.email ?? '';
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 60,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.person, size: 36, color: AppColors.primaryContainer),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(displayName, style: AppTypography.headlineMd.copyWith(color: AppColors.onPrimary)),
+                          if (email.isNotEmpty)
+                            Text(email, style: AppTypography.bodyMd.copyWith(color: AppColors.onPrimary.withValues(alpha: 0.7))),
+                        ],
+                      );
+                    },
                   ),
                 ),
                 ListTile(

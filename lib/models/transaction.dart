@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum TransactionType { income, expense }
 
 class Transaction {
@@ -51,7 +53,7 @@ class Transaction {
       'merchant': merchant,
       'category': category,
       'subcategory': subcategory,
-      'date': date.toIso8601String(),
+      'date': Timestamp.fromDate(date),
       'accountId': accountId,
       'paymentMethod': paymentMethod,
       'upiReference': upiReference,
@@ -61,13 +63,19 @@ class Transaction {
       'isManual': isManual,
       'isRecurring': isRecurring,
       'notes': notes,
-      'createdAt': createdAt?.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'subtitle': subtitle,
     };
   }
 
   factory Transaction.fromMap(Map<String, dynamic> map) {
+    DateTime parseDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.parse(val);
+      return DateTime.now();
+    }
+
     return Transaction(
       id: map['id'],
       amount: (map['amount'] as num).toDouble(),
@@ -75,7 +83,7 @@ class Transaction {
       merchant: map['merchant'],
       category: map['category'],
       subcategory: map['subcategory'],
-      date: DateTime.parse(map['date']),
+      date: parseDate(map['date']),
       accountId: map['accountId'],
       paymentMethod: map['paymentMethod'],
       upiReference: map['upiReference'],
@@ -85,8 +93,8 @@ class Transaction {
       isManual: map['isManual'] ?? false,
       isRecurring: map['isRecurring'] ?? false,
       notes: map['notes'],
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : null,
-      updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
+      createdAt: map['createdAt'] != null ? parseDate(map['createdAt']) : null,
+      updatedAt: map['updatedAt'] != null ? parseDate(map['updatedAt']) : null,
       subtitle: map['subtitle'],
     );
   }

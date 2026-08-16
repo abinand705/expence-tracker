@@ -3,8 +3,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../services/sms_service.dart';
-import '../models/message_settings.dart';
-
 class MessagesSettingsScreen extends StatefulWidget {
   const MessagesSettingsScreen({super.key});
 
@@ -179,7 +177,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
       subtitle: subtitle != null ? Text(subtitle, style: AppTypography.labelMuted) : null,
       value: value,
       onChanged: onChanged,
-      activeColor: Colors.white,
+      activeThumbColor: Colors.white,
       activeTrackColor: AppColors.primary,
       inactiveThumbColor: AppColors.outlineVariant,
       inactiveTrackColor: AppColors.surfaceContainer,

@@ -1,36 +1,64 @@
-import '../models/transaction.dart';
-import '../services/sms_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/transaction.dart' as model;
 
 class TransactionRepository {
-  // Temporary mock implementation using SmsService
-  
-  Future<List<Transaction>> getTransactions() async {
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 500));
-    return SmsService().parsedTransactions;
-  }
+  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
+    app: Firebase.app(),
+    databaseId: 'moneytrack',
+  );
 
-  Future<Transaction?> getTransactionById(String id) async {
-    final transactions = await getTransactions();
-    try {
-      return transactions.firstWhere((t) => t.id == id);
-    } catch (e) {
-      return null;
+  String get _uid {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('User is not authenticated');
     }
+    return user.uid;
   }
 
-  Future<void> addTransaction(Transaction transaction) async {
-    // In a real app, this would write to Firestore
-    await Future.delayed(const Duration(milliseconds: 500));
+  CollectionReference<Map<String, dynamic>> get _transactionsRef {
+    return _firestore.collection('users').doc(_uid).collection('transactions');
   }
 
-  Future<void> updateTransaction(Transaction transaction) async {
-    // In a real app, this would update Firestore
-    await Future.delayed(const Duration(milliseconds: 500));
+  Future<List<model.Transaction>> getTransactions() async {
+    final snapshot = await _transactionsRef.orderBy('date', descending: true).get();
+    return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
+  }
+
+  Stream<List<model.Transaction>> watchTransactions() {
+    return _transactionsRef.orderBy('date', descending: true).snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
+    });
+  }
+
+  Future<model.Transaction?> getTransactionById(String id) async {
+    final doc = await _transactionsRef.doc(id).get();
+    if (!doc.exists) return null;
+    return model.Transaction.fromMap(doc.data()!);
+  }
+
+  Future<String> addTransaction(model.Transaction transaction) async {
+    final docRef = _transactionsRef.doc(transaction.id);
+    
+    final data = transaction.toMap();
+    data['createdAt'] = FieldValue.serverTimestamp();
+    data['updatedAt'] = FieldValue.serverTimestamp();
+    
+    await docRef.set(data);
+    return docRef.id;
+  }
+
+  Future<void> updateTransaction(model.Transaction transaction) async {
+    final docRef = _transactionsRef.doc(transaction.id);
+    
+    final data = transaction.toMap();
+    data['updatedAt'] = FieldValue.serverTimestamp();
+    
+    await docRef.update(data);
   }
 
   Future<void> deleteTransaction(String id) async {
-    // In a real app, this would delete from Firestore
-    await Future.delayed(const Duration(milliseconds: 500));
+    await _transactionsRef.doc(id).delete();
   }
 }
