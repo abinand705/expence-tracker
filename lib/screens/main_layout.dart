@@ -30,8 +30,8 @@ class _MainLayoutState extends State<MainLayout> {
     try {
       if (AppUpdateService().hasPromptedThisSession) return;
 
-      final release = await AppUpdateService().checkForUpdate();
-      if (release != null && mounted) {
+      final result = await AppUpdateService().checkForUpdate();
+      if (result.status == UpdateCheckStatus.updateAvailable && result.release != null && mounted) {
         AppUpdateService().markAsPrompted();
         final packageInfo = await AppUpdateService().getAppVersionInfo();
         if (mounted) {
@@ -39,7 +39,7 @@ class _MainLayoutState extends State<MainLayout> {
             context: context,
             barrierDismissible: false,
             builder: (context) => UpdateDialog(
-              release: release,
+              release: result.release!,
               currentPackageInfo: packageInfo,
             ),
           );

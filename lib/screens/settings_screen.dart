@@ -136,28 +136,47 @@ class _AppVersionCardState extends State<_AppVersionCard> {
     });
 
     try {
-      final release = await AppUpdateService().checkForUpdate();
+      final result = await AppUpdateService().checkForUpdate();
       if (!mounted) return;
 
-      if (release != null) {
+      if (result.status == UpdateCheckStatus.updateAvailable && result.release != null) {
         setState(() => _updateStatus = 'available');
         await showDialog<bool>(
           context: context,
           barrierDismissible: false,
           builder: (context) => UpdateDialog(
-            release: release,
+            release: result.release!,
             currentPackageInfo: _packageInfo!,
           ),
         );
-        // If they updated or canceled, you can handle it.
-        // We do not reset the state, just leave it as available.
-      } else {
+      } else if (result.status == UpdateCheckStatus.upToDate) {
         setState(() => _updateStatus = 'up_to_date');
+      } else {
+        String message;
+        switch (result.status) {
+          case UpdateCheckStatus.networkError:
+            message = 'Unable to connect to the update service.\nPlease check your internet connection and try again.';
+            break;
+          case UpdateCheckStatus.notAuthorized:
+            message = 'Your tester account is not authorized for this app.';
+            break;
+          case UpdateCheckStatus.configurationError:
+            message = 'App updates are not currently available for this installation.';
+            break;
+          case UpdateCheckStatus.unknownError:
+          default:
+            message = 'Unable to check for updates right now.\nPlease try again later.';
+            break;
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to check for updates. Please check your internet connection and try again.')),
+        const SnackBar(content: Text('Unable to check for updates right now.\nPlease try again later.')),
       );
     } finally {
       if (mounted) {
