@@ -120,26 +120,46 @@ class SmsService extends ChangeNotifier {
     notifyListeners();
   }
 
+  final Map<String, String> _contactCache = {};
+  bool _isLoadingSms = false;
+
   Future<void> _loadContacts() async {
     try {
       if (await Permission.contacts.request().isGranted) {
-        final contacts = await FlutterContacts.getAll(properties: {ContactProperty.phone});
+        if (_contactCache.isEmpty) {
+          final contacts = await FlutterContacts.getAll(properties: {ContactProperty.phone});
+          for (var contact in contacts) {
+             for (var phone in contact.phones) {
+                 final cleanPhone = phone.number.replaceAll(RegExp(r'\D'), '');
+                 if (cleanPhone.isNotEmpty && contact.displayName != null && contact.displayName!.isNotEmpty) {
+                    _contactCache[cleanPhone] = contact.displayName!;
+                 }
+             }
+          }
+        }
+        
         bool changed = false;
         for (var conv in _conversations) {
           if (!conv.isBankSender) {
-            for (var contact in contacts) {
-              if (contact.phones.isNotEmpty) {
-                final contactNum = contact.phones.first.number.replaceAll(RegExp(r'\D'), '');
-                final convNum = conv.senderNumber.replaceAll(RegExp(r'\D'), '');
-                if (contactNum.isNotEmpty && (contactNum.contains(convNum) || convNum.contains(contactNum))) {
-                  final displayName = contact.displayName;
-                  if (displayName != null && displayName.isNotEmpty && conv.senderName != displayName) {
-                    conv.senderName = displayName;
-                    changed = true;
-                  }
-                  break;
-                }
-              }
+            final convNum = conv.senderNumber.replaceAll(RegExp(r'\D'), '');
+            if (convNum.isNotEmpty) {
+               String? name;
+               if (_contactCache.containsKey(convNum)) {
+                   name = _contactCache[convNum];
+               } else {
+                   for (var entry in _contactCache.entries) {
+                       if (entry.key.contains(convNum) || convNum.contains(entry.key)) {
+                           name = entry.value;
+                           _contactCache[convNum] = name;
+                           break;
+                       }
+                   }
+               }
+               
+               if (name != null && conv.senderName != name) {
+                  conv.senderName = name;
+                  changed = true;
+               }
             }
           }
         }
@@ -149,10 +169,17 @@ class SmsService extends ChangeNotifier {
   }
 
   Future<void> loadDeviceSms() async {
+    if (_isLoadingSms) {
+      debugPrint('[SmsService] already loading SMS, skipping');
+      return;
+    }
+    
+    _isLoadingSms = true;
     debugPrint('[SmsService] loadDeviceSms START');
     final status = await Permission.sms.status;
     if (!status.isGranted) {
       debugPrint('[SmsService] SMS permission not granted');
+      _isLoadingSms = false;
       return;
     }
 
@@ -263,6 +290,8 @@ class SmsService extends ChangeNotifier {
       
     } catch (e) {
       debugPrint('[SmsService] loadDeviceSms failed: $e');
+    } finally {
+      _isLoadingSms = false;
     }
   }
 

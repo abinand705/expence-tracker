@@ -3,6 +3,35 @@ import '../theme/app_colors.dart';
 import '../repositories/category_repository.dart';
 import '../models/category.dart';
 
+class CategoryIconRegistry {
+  static final Map<int, IconData> _registry = {
+    Icons.restaurant.codePoint: Icons.restaurant,
+    Icons.shopping_bag.codePoint: Icons.shopping_bag,
+    Icons.receipt.codePoint: Icons.receipt,
+    Icons.category.codePoint: Icons.category,
+    Icons.account_balance_wallet.codePoint: Icons.account_balance_wallet,
+    Icons.directions_car.codePoint: Icons.directions_car,
+    Icons.receipt_long.codePoint: Icons.receipt_long,
+    Icons.flight.codePoint: Icons.flight,
+    Icons.local_grocery_store.codePoint: Icons.local_grocery_store,
+    Icons.movie.codePoint: Icons.movie,
+    Icons.fitness_center.codePoint: Icons.fitness_center,
+    Icons.health_and_safety.codePoint: Icons.health_and_safety,
+    Icons.school.codePoint: Icons.school,
+    Icons.home.codePoint: Icons.home,
+    Icons.pets.codePoint: Icons.pets,
+    Icons.fastfood.codePoint: Icons.fastfood,
+    Icons.local_cafe.codePoint: Icons.local_cafe,
+    Icons.work.codePoint: Icons.work,
+    Icons.attach_money.codePoint: Icons.attach_money,
+    Icons.more_horiz.codePoint: Icons.more_horiz,
+  };
+
+  static IconData getIcon(int codePoint) {
+    return _registry[codePoint] ?? Icons.category;
+  }
+}
+
 class CategoryIcon extends StatelessWidget {
   final String category;
   final double size;
@@ -63,8 +92,7 @@ class CategoryIcon extends StatelessWidget {
                 (c) => c.name.toLowerCase() == category.toLowerCase());
             bgColor = Color(dynamicCategory.colorValue).withValues(alpha: 0.2);
             iconColor = Color(dynamicCategory.colorValue);
-            // ignore: non_const_argument_for_const_parameter
-            iconData = IconData(dynamicCategory.iconCodePoint, fontFamily: 'MaterialIcons');
+            iconData = CategoryIconRegistry.getIcon(dynamicCategory.iconCodePoint);
           } catch (_) {
             // Not found in dynamic categories, fallback used
           }

@@ -536,9 +536,25 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   }
 
   Future<void> _handleImportStatement(BuildContext context, Account account) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: AppSpacing.md),
+            Text('Reading and parsing statement...'),
+          ],
+        ),
+      ),
+    );
+
     try {
       final service = BankStatementService();
       final parsedStatement = await service.pickAndParseStatement(account);
+      
+      if (context.mounted) Navigator.pop(context); // close loading dialog
       
       if (parsedStatement != null && context.mounted) {
         // Show preview screen
@@ -555,6 +571,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         );
       }
     } catch (e) {
+      if (context.mounted) Navigator.pop(context); // close loading dialog
       if (context.mounted) {
         showDialog(
           context: context,

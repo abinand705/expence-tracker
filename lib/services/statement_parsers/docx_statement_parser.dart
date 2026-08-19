@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
 import '../../models/bank_statement.dart';
 import 'statement_parser.dart';
+import 'dart:developer' as developer;
 
 class DocxStatementParser implements StatementParser {
   @override
@@ -56,15 +57,14 @@ class DocxStatementParser implements StatementParser {
         currentTableRows.add(rowData);
 
         if (headerRowIndex == -1) {
-          int matches = 0;
           colMap.clear();
           for (int j = 0; j < rowData.length; j++) {
             final cellValue = rowData[j].toLowerCase();
-            if (possibleDateCols.contains(cellValue)) { colMap['date'] = j; matches++; }
-            else if (possibleDescCols.contains(cellValue)) { colMap['description'] = j; matches++; }
-            else if (possibleDebitCols.contains(cellValue)) { colMap['debit'] = j; matches++; }
-            else if (possibleCreditCols.contains(cellValue)) { colMap['credit'] = j; matches++; }
-            else if (possibleBalanceCols.contains(cellValue)) { colMap['balance'] = j; matches++; }
+            if (possibleDateCols.contains(cellValue)) { colMap['date'] = j; }
+            else if (possibleDescCols.contains(cellValue)) { colMap['description'] = j; }
+            else if (possibleDebitCols.contains(cellValue)) { colMap['debit'] = j; }
+            else if (possibleCreditCols.contains(cellValue)) { colMap['credit'] = j; }
+            else if (possibleBalanceCols.contains(cellValue)) { colMap['balance'] = j; }
             else if (possibleRefCols.contains(cellValue)) { colMap['reference'] = j; }
           }
           if (colMap.containsKey('date') && colMap.containsKey('description') && (colMap.containsKey('debit') || colMap.containsKey('credit'))) {
@@ -125,7 +125,7 @@ class DocxStatementParser implements StatementParser {
           rawRowFingerprint: fingerprint,
         ));
       } catch (e) {
-        print('Skipping DOCX row due to error: $e');
+        developer.log('Skipping DOCX row due to error: $e', name: 'DocxStatementParser');
         continue;
       }
     }

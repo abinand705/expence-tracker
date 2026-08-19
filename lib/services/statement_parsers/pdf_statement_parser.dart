@@ -16,7 +16,7 @@ class PdfStatementParser implements StatementParser {
     final text = extractor.extractText();
     document.dispose();
 
-    if (text == null || text.trim().isEmpty) {
+    if (text.trim().isEmpty) {
       throw Exception('Unable to read this PDF statement. Please use a text-based bank statement or CSV/XLSX.');
     }
 
@@ -39,15 +39,14 @@ class PdfStatementParser implements StatementParser {
       final cols = line.split(RegExp(r'\s{2,}|\t'));
       
       if (headerRowIndex == -1) {
-        int matches = 0;
         colMap.clear();
         for (int j = 0; j < cols.length; j++) {
           final cellValue = cols[j].toLowerCase().trim();
-          if (possibleDateCols.contains(cellValue)) { colMap['date'] = j; matches++; }
-          else if (possibleDescCols.contains(cellValue)) { colMap['description'] = j; matches++; }
-          else if (possibleDebitCols.contains(cellValue)) { colMap['debit'] = j; matches++; }
-          else if (possibleCreditCols.contains(cellValue)) { colMap['credit'] = j; matches++; }
-          else if (possibleBalanceCols.contains(cellValue)) { colMap['balance'] = j; matches++; }
+          if (possibleDateCols.contains(cellValue)) { colMap['date'] = j; }
+          else if (possibleDescCols.contains(cellValue)) { colMap['description'] = j; }
+          else if (possibleDebitCols.contains(cellValue)) { colMap['debit'] = j; }
+          else if (possibleCreditCols.contains(cellValue)) { colMap['credit'] = j; }
+          else if (possibleBalanceCols.contains(cellValue)) { colMap['balance'] = j; }
         }
         if (colMap.containsKey('date') && colMap.containsKey('description') && (colMap.containsKey('debit') || colMap.containsKey('credit'))) {
           headerRowIndex = i;

@@ -2,12 +2,80 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-class HelpSupportScreen extends StatelessWidget {
+class HelpSupportScreen extends StatefulWidget {
   const HelpSupportScreen({super.key});
 
   @override
+  State<HelpSupportScreen> createState() => _HelpSupportScreenState();
+}
+
+class _HelpSupportScreenState extends State<HelpSupportScreen> {
+  final TextEditingController _messageController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitMessage() async {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a message to send.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final userName = user?.displayName ?? 'Anonymous';
+      final userEmail = user?.email ?? 'No email';
+
+      await FirebaseFirestore.instance.collection('support_messages').add({
+        'userId': user?.uid,
+        'name': userName,
+        'email': userEmail,
+        'message': message,
+        'createdAt': FieldValue.serverTimestamp(),
+        'status': 'new',
+      });
+
+      if (mounted) {
+        _messageController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Message sent successfully. We will get back to you soon!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send message: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = user?.displayName ?? 'User Name';
+    final userEmail = user?.email ?? 'user@example.com';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -73,25 +141,35 @@ class HelpSupportScreen extends StatelessWidget {
                   
                   _buildTextFieldLabel('Name'),
                   const SizedBox(height: AppSpacing.xs),
-                  _buildTextField('John Doe'),
+                  _buildTextField(userName, readOnly: true),
                   const SizedBox(height: AppSpacing.sm),
                   
                   _buildTextFieldLabel('Email Address'),
                   const SizedBox(height: AppSpacing.xs),
-                  _buildTextField('john@example.com'),
+                  _buildTextField(userEmail, readOnly: true),
                   const SizedBox(height: AppSpacing.sm),
                   
                   _buildTextFieldLabel('Message'),
                   const SizedBox(height: AppSpacing.xs),
-                  _buildTextField('Describe your issue...', maxLines: 4),
+                  _buildTextField('Describe your issue...', maxLines: 4, controller: _messageController),
                   const SizedBox(height: AppSpacing.lg),
                   
                   ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.send, color: AppColors.onPrimary, size: 18),
-                    label: Text('Send Message', style: AppTypography.bodyLg.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
+                    onPressed: _isSubmitting ? null : _submitMessage,
+                    icon: _isSubmitting 
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
+                          )
+                        : const Icon(Icons.send, color: AppColors.onPrimary, size: 18),
+                    label: Text(
+                      _isSubmitting ? 'Sending...' : 'Send Message', 
+                      style: AppTypography.bodyLg.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
                       minimumSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
@@ -157,9 +235,11 @@ class HelpSupportScreen extends StatelessWidget {
     );
   }
   
-  Widget _buildTextField(String hint, {int maxLines = 1}) {
+  Widget _buildTextField(String hint, {int maxLines = 1, bool readOnly = false, TextEditingController? controller}) {
     return TextField(
+      controller: controller,
       maxLines: maxLines,
+      readOnly: readOnly,
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),

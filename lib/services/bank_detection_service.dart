@@ -98,8 +98,9 @@ class BankDetectionService {
     }
     debugPrint('[BankDetection] processMessages START: $totalMessages messages');
     
-    // Group by account to avoid hammering Firestore for the same account inside a single loop
-    final Map<String, Account> accountsToCreate = {};
+    // Group messages by account
+    final Map<String, List<Message>> messagesByAccount = {};
+    final Map<String, BankDefinition> accountBankMap = {};
 
     for (final entry in senderToMessages.entries) {
       final sender = entry.key;
@@ -107,72 +108,111 @@ class BankDetectionService {
 
       for (final msg in messages) {
         final bank = identifyBank(sender, msg.text);
-        if (bank == null) {
-          if (ExpenseParser.parse(msg.text) != null) {
-            // It looks like a financial message, but we didn't identify the bank
-            // Mask sender slightly if needed, but since sender is usually 6-9 chars like 'VM-FEDERAL', we just print it.
-            debugPrint('[BankDetection] unrecognized financial sender: $sender');
-            debugPrint('[BankDetection] possible financial message: YES');
-          }
-          continue;
-        }
+        if (bank == null) continue;
 
         final last4 = ExpenseParser.extractAccountNumber(msg.text);
-        if (last4 == null || last4.isEmpty) {
-          debugPrint('[BankDetection] bank matched: ${bank.displayName}');
-          debugPrint('[BankDetection] account suffix found: NO');
-          continue;
-        }
+        if (last4 == null || last4.isEmpty) continue;
 
-        
-        final balance = ExpenseParser.extractBalance(msg.text);
         final accountId = '${bank.id}_$last4';
-
-        if (!accountsToCreate.containsKey(accountId)) {
-          accountsToCreate[accountId] = Account(
-            id: accountId,
-            name: '${bank.displayName} Account',
-            bankName: bank.displayName,
-            accountNumber: last4,
-            accountType: 'Savings', // Default fallback
-            balance: balance ?? 0.0,
-            accentColor: bank.accentColor,
-            isAutoDiscovered: true,
-            createdAt: msg.timestamp,
-          );
-        } else {
-          // Update balance to the latest known if we parsed one
-          if (balance != null) {
-            final existing = accountsToCreate[accountId]!;
-            if (existing.balance == 0.0) {
-              accountsToCreate[accountId] = Account(
-                id: existing.id,
-                name: existing.name,
-                bankName: existing.bankName,
-                accountNumber: existing.accountNumber,
-                accountType: existing.accountType,
-                balance: balance,
-                currency: existing.currency,
-                accentColor: existing.accentColor,
-                isAutoDiscovered: existing.isAutoDiscovered,
-                createdAt: existing.createdAt,
-              );
-            }
-          }
-        }
+        messagesByAccount.putIfAbsent(accountId, () => []).add(msg);
+        accountBankMap[accountId] = bank;
       }
     }
 
-    debugPrint('[BankDetection] unique accounts discovered: ${accountsToCreate.length}');
+    debugPrint('[BankDetection] unique accounts discovered from SMS: ${messagesByAccount.length}');
 
-    for (final account in accountsToCreate.values) {
-      debugPrint('[BankDetection] creating account: ${account.id}');
-      try {
-        final bankId = account.id.split('_').first;
-        await _accountRepo.cleanupLegacyAutoDiscoveredAccounts(account.id, bankId, account.accountNumber);
-        await _accountRepo.addAccountIfAbsent(account);
-      } catch (e) {
-        debugPrint('[BankDetection] failed to process account ${account.id}: $e');
+    // Fetch existing accounts so we can do authority logic
+    final existingAccounts = await _accountRepo.getAccounts();
+    final Map<String, Account> existingAccountsMap = { for (var acc in existingAccounts) acc.id: acc };
+
+    for (final entry in messagesByAccount.entries) {
+      final accountId = entry.key;
+      final bank = accountBankMap[accountId]!;
+      final last4 = accountId.split('_').last;
+      
+      // Sort messages by timestamp descending (newest first)
+      final sortedMessages = entry.value..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      
+      // Find the newest valid balance
+      double? newestValidBalance;
+      DateTime? balanceUpdatedAt;
+      
+      for (final msg in sortedMessages) {
+        final balance = ExpenseParser.extractBalance(msg.text);
+        if (balance != null) {
+          newestValidBalance = balance;
+          balanceUpdatedAt = msg.timestamp;
+          break; // Stop at the first (newest) valid balance
+        }
+      }
+
+      final existingAcc = existingAccountsMap[accountId];
+      
+      if (existingAcc == null) {
+        // Account does not exist, create it
+        final newAccount = Account(
+          id: accountId,
+          name: '${bank.displayName} Account',
+          bankName: bank.displayName,
+          accountNumber: last4,
+          accountType: 'Savings',
+          balance: newestValidBalance ?? 0.0,
+          currentBalance: newestValidBalance ?? 0.0,
+          balanceSource: newestValidBalance != null ? 'sms' : 'manual',
+          balanceUpdatedAt: balanceUpdatedAt,
+          accentColor: bank.accentColor,
+          isAutoDiscovered: true,
+          createdAt: DateTime.now(),
+        );
+        
+        debugPrint('[BankDetection] creating account: $accountId');
+        try {
+          await _accountRepo.cleanupLegacyAutoDiscoveredAccounts(accountId, bank.id, last4);
+          await _accountRepo.addAccountIfAbsent(newAccount);
+        } catch (e) {
+          debugPrint('[BankDetection] failed to create account $accountId: $e');
+        }
+      } else {
+        // Account exists. 
+        if (newestValidBalance != null && balanceUpdatedAt != null) {
+          // Check authority rules
+          bool shouldUpdate = false;
+          
+          if (existingAcc.balanceSource == 'statement') {
+            // Statements are more authoritative. Only update if SMS is newer than statement import
+            final statementDate = existingAcc.lastStatementImportAt ?? existingAcc.balanceUpdatedAt;
+            if (statementDate == null || balanceUpdatedAt.isAfter(statementDate)) {
+               shouldUpdate = true;
+            }
+          } else {
+            // If manual or sms, just use the newest one
+            final currentUpdated = existingAcc.balanceUpdatedAt;
+            if (currentUpdated == null || balanceUpdatedAt.isAfter(currentUpdated)) {
+               shouldUpdate = true;
+            }
+          }
+
+          if (shouldUpdate) {
+            debugPrint('[BankDetection] updating balance for account $accountId from SMS ($newestValidBalance)');
+            final updatedAccount = Account(
+              id: existingAcc.id,
+              name: existingAcc.name,
+              bankName: existingAcc.bankName,
+              accountNumber: existingAcc.accountNumber,
+              accountType: existingAcc.accountType,
+              balance: existingAcc.balance, // legacy
+              currentBalance: newestValidBalance,
+              balanceSource: 'sms',
+              balanceUpdatedAt: balanceUpdatedAt,
+              lastStatementImportAt: existingAcc.lastStatementImportAt,
+              currency: existingAcc.currency,
+              accentColor: existingAcc.accentColor,
+              isAutoDiscovered: existingAcc.isAutoDiscovered,
+              createdAt: existingAcc.createdAt,
+            );
+            await _accountRepo.updateAccount(updatedAccount);
+          }
+        }
       }
     }
   }

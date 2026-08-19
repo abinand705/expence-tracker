@@ -6,6 +6,8 @@ import 'my_accounts_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_drawer.dart';
+import '../services/app_update_service.dart';
+import '../widgets/update_dialog.dart';
 
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
@@ -17,6 +19,37 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _currentIndex = 0;
   
+  @override
+  void initState() {
+    super.initState();
+    _performStartupUpdateCheck();
+  }
+
+  Future<void> _performStartupUpdateCheck() async {
+    // Non-blocking check for updates
+    try {
+      if (AppUpdateService().hasPromptedThisSession) return;
+
+      final release = await AppUpdateService().checkForUpdate();
+      if (release != null && mounted) {
+        AppUpdateService().markAsPrompted();
+        final packageInfo = await AppUpdateService().getAppVersionInfo();
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => UpdateDialog(
+              release: release,
+              currentPackageInfo: packageInfo,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Silently fail on startup check
+    }
+  }
+
   List<Widget> get _screens => [
     DashboardScreen(
       onSeeAllClicked: () {

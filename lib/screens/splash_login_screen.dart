@@ -275,7 +275,23 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: null, // Disabled for now
+                        onPressed: _isLoading ? null : () async {
+                          setState(() => _isLoading = true);
+                          final messenger = ScaffoldMessenger.of(context);
+                          try {
+                            await _authService.signInWithGoogle();
+                          } catch (e) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(e.toString()),
+                                backgroundColor: AppColors.errorRed,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          } finally {
+                            if (mounted) setState(() => _isLoading = false);
+                          }
+                        },
                         style: OutlinedButton.styleFrom(
                           backgroundColor: AppColors.surfaceBright,
                           side: const BorderSide(color: AppColors.surfaceVariant),
@@ -287,7 +303,7 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                           children: [
                             const Text('G', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 20)),
                             const SizedBox(width: AppSpacing.md),
-                            Text('Continue with Google', style: AppTypography.bodyLg.copyWith(color: AppColors.outline)),
+                            Text('Continue with Google', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface)),
                           ],
                         ),
                       ),

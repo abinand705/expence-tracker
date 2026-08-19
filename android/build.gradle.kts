@@ -15,6 +15,8 @@ subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
+
+apply(from = "force_compile_sdk.gradle")
 subprojects {
     project.evaluationDependsOn(":app")
 }

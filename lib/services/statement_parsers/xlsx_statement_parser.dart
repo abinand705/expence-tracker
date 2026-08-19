@@ -31,9 +31,7 @@ class XlsxStatementParser implements StatementParser {
 
       for (int i = 0; i < sheetRows.length; i++) {
         final row = sheetRows[i];
-        int matches = 0;
         colMap.clear();
-
         for (int j = 0; j < row.length; j++) {
           final cellValue = row[j]?.value?.toString().toLowerCase().trim() ?? '';
           if (possibleDateCols.contains(cellValue)) { colMap['date'] = j; }

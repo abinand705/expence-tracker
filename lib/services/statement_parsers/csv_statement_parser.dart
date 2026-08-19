@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:intl/intl.dart';
 import '../../models/bank_statement.dart';
 import 'statement_parser.dart';
+import 'dart:developer' as developer;
 
 class CsvStatementParser implements StatementParser {
   @override
@@ -34,14 +35,13 @@ class CsvStatementParser implements StatementParser {
     // Find header row
     for (int i = 0; i < rows.length; i++) {
       final row = rows[i];
-      int matches = 0;
       for (int j = 0; j < row.length; j++) {
         final cell = row[j].toString().toLowerCase().trim();
-        if (possibleDateCols.contains(cell)) { colMap['date'] = j; matches++; }
-        else if (possibleDescCols.contains(cell)) { colMap['description'] = j; matches++; }
-        else if (possibleDebitCols.contains(cell)) { colMap['debit'] = j; matches++; }
-        else if (possibleCreditCols.contains(cell)) { colMap['credit'] = j; matches++; }
-        else if (possibleBalanceCols.contains(cell)) { colMap['balance'] = j; matches++; }
+        if (possibleDateCols.contains(cell)) { colMap['date'] = j; }
+        else if (possibleDescCols.contains(cell)) { colMap['description'] = j; }
+        else if (possibleDebitCols.contains(cell)) { colMap['debit'] = j; }
+        else if (possibleCreditCols.contains(cell)) { colMap['credit'] = j; }
+        else if (possibleBalanceCols.contains(cell)) { colMap['balance'] = j; }
         else if (possibleRefCols.contains(cell)) { colMap['reference'] = j; }
       }
       if (colMap.containsKey('date') && colMap.containsKey('description') && (colMap.containsKey('debit') || colMap.containsKey('credit'))) {
@@ -100,7 +100,7 @@ class CsvStatementParser implements StatementParser {
           rawRowFingerprint: fingerprint,
         ));
       } catch (e) {
-        print('Skipping CSV row due to error: $e');
+        developer.log('Skipping CSV row due to error: $e', name: 'CsvStatementParser');
         continue;
       }
     }

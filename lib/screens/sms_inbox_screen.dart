@@ -10,7 +10,6 @@ import 'conversation_view_screen.dart';
 import 'new_message_screen.dart';
 import 'messages_settings_screen.dart';
 import 'bin_screen.dart';
-import 'compose_sms_screen.dart';
 import '../services/sms_transaction_importer.dart';
 import '../repositories/transaction_repository.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -515,16 +514,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ComposeSmsScreen()),
-          );
-        },
-        backgroundColor: AppColors.primaryContainer,
-        child: const Icon(Icons.message, color: AppColors.onPrimary),
-      ),
+
     );
   }
 

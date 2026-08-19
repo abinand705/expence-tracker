@@ -24,6 +24,8 @@ class Transaction {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? subtitle;
+  final String? sourceId;
+  final String? sourceFingerprint;
 
   Transaction({
     required this.id,
@@ -47,6 +49,8 @@ class Transaction {
     this.createdAt,
     this.updatedAt,
     this.subtitle,
+    this.sourceId,
+    this.sourceFingerprint,
   });
 
   Map<String, dynamic> toMap() {
@@ -72,6 +76,8 @@ class Transaction {
       'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : null,
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'subtitle': subtitle,
+      'sourceId': sourceId,
+      'sourceFingerprint': sourceFingerprint,
     };
   }
 
@@ -104,6 +110,8 @@ class Transaction {
       createdAt: map['createdAt'] != null ? parseDate(map['createdAt']) : null,
       updatedAt: map['updatedAt'] != null ? parseDate(map['updatedAt']) : null,
       subtitle: map['subtitle'],
+      sourceId: map['sourceId'],
+      sourceFingerprint: map['sourceFingerprint'],
     );
   }
 }

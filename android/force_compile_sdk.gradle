@@ -1,0 +1,17 @@
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                if (compileSdkVersion != null) {
+                    def versionStr = compileSdkVersion.toString().replace("android-", "")
+                    if (versionStr.isInteger()) {
+                        def version = versionStr.toInteger()
+                        if (version < 34) {
+                            compileSdkVersion 36
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

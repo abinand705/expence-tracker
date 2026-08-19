@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../repositories/user_repository.dart';
 
 class AuthService {
@@ -61,9 +62,54 @@ class AuthService {
 
   Future<void> logout() async {
     try {
-      await _auth.signOut();
+      await Future.wait([
+        _auth.signOut(),
+        GoogleSignIn().signOut(),
+      ]);
     } catch (e) {
       throw 'Failed to log out. Please check your connection and try again.';
+    }
+  }
+
+  Future<UserCredential> signInWithGoogle() async {
+    try {
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+      if (googleUser == null) {
+        // The user canceled the sign-in
+        throw 'Google sign in was canceled.';
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Once signed in, return the UserCredential
+      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      
+      // Ensure profile exists in Firestore
+      if (userCredential.user != null) {
+        final profile = await UserRepository().getProfile(userCredential.user!.uid);
+        if (profile == null) {
+           await UserRepository().createProfile(
+             uid: userCredential.user!.uid,
+             displayName: userCredential.user!.displayName ?? 'Google User',
+             email: userCredential.user!.email ?? '',
+           );
+        }
+      }
+
+      return userCredential;
+    } on FirebaseAuthException catch (e) {
+      throw _handleFirebaseAuthException(e);
+    } catch (e) {
+      throw 'Failed to sign in with Google: ${e.toString()}';
     }
   }
 

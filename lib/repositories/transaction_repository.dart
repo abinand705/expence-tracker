@@ -26,6 +26,14 @@ class TransactionRepository {
     return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
   }
 
+  Future<List<model.Transaction>> getTransactionsForAccount(String accountId) async {
+    final snapshot = await _transactionsRef
+        .where('accountId', isEqualTo: accountId)
+        .orderBy('date', descending: true)
+        .get();
+    return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
+  }
+
   Stream<List<model.Transaction>> watchTransactions() {
     return _transactionsRef.orderBy('date', descending: true).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
@@ -65,6 +73,28 @@ class TransactionRepository {
       tx.set(docRef, data);
       return true;
     });
+  }
+
+  Future<void> batchAddTransactions(List<model.Transaction> transactions) async {
+    if (transactions.isEmpty) return;
+    
+    // Firestore batches can have max 500 operations
+    final maxBatchSize = 500;
+    
+    for (int i = 0; i < transactions.length; i += maxBatchSize) {
+      final batch = _firestore.batch();
+      final chunk = transactions.skip(i).take(maxBatchSize);
+      
+      for (final tx in chunk) {
+        final docRef = _transactionsRef.doc(tx.id);
+        final data = tx.toMap();
+        data['createdAt'] = FieldValue.serverTimestamp();
+        data['updatedAt'] = FieldValue.serverTimestamp();
+        batch.set(docRef, data);
+      }
+      
+      await batch.commit();
+    }
   }
 
   Future<void> updateTransaction(model.Transaction transaction) async {
