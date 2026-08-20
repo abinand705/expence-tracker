@@ -21,7 +21,7 @@ class SmsInboxScreen extends StatefulWidget {
   State<SmsInboxScreen> createState() => _SmsInboxScreenState();
 }
 
-class _SmsInboxScreenState extends State<SmsInboxScreen> {
+class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObserver {
   final SmsService _smsService = SmsService();
   final TextEditingController _searchController = TextEditingController();
   bool _isSyncing = false;
@@ -30,6 +30,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkPermission();
   }
 
@@ -60,8 +61,26 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _recheckPermissionOnResume();
+    }
+  }
+
+  Future<void> _recheckPermissionOnResume() async {
+    final status = await Permission.sms.status;
+    if (status.isGranted && _smsPermissionStatus != PermissionStatus.granted) {
+      setState(() {
+        _smsPermissionStatus = status;
+      });
+      _smsService.loadDeviceSms();
+    }
   }
 
   String _formatTimestamp(DateTime time) {
@@ -206,7 +225,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> {
             Text(
               isPermanentlyDenied 
                 ? 'SMS permission has been permanently denied. Please open Android settings to grant MoneyTrack access to read SMS.'
-                : 'MoneyTrack needs SMS access to automatically read bank transactions and track your expenses.',
+                : 'MoneyTrack reads bank transaction SMS messages to automatically\nidentify your income and expenses.\n\nYour SMS messages are processed for transaction detection.',
               textAlign: TextAlign.center,
               style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
             ),

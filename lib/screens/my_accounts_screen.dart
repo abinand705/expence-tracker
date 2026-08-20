@@ -7,6 +7,11 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../services/bank_statement_service.dart';
+import '../services/analytics_service.dart';
+import '../repositories/transaction_repository.dart';
+import '../repositories/pending_due_repository.dart';
+import '../models/transaction.dart';
+import '../models/pending_due.dart';
 import 'import_statement_preview_screen.dart';
 
 class MyAccountsScreen extends StatefulWidget {
@@ -18,9 +23,18 @@ class MyAccountsScreen extends StatefulWidget {
 
 class _MyAccountsScreenState extends State<MyAccountsScreen> {
   final AccountRepository _accountRepo = AccountRepository();
+  final TransactionRepository _transactionRepo = TransactionRepository();
+  final PendingDueRepository _dueRepo = PendingDueRepository();
+  final AnalyticsService _analyticsService = AnalyticsService();
+
   List<Account> _accounts = [];
+  List<Transaction> _transactions = [];
+  List<PendingDue> _pendingDues = [];
+  
   bool _isLoading = true;
   StreamSubscription<List<Account>>? _accountSubscription;
+  StreamSubscription<List<Transaction>>? _transactionSubscription;
+  StreamSubscription<List<PendingDue>>? _dueSubscription;
 
   @override
   void initState() {
@@ -40,11 +54,29 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         }
       },
     );
+
+    _transactionSubscription = _transactionRepo.watchTransactions().listen(
+      (transactions) {
+        if (mounted) setState(() => _transactions = transactions);
+      },
+    );
+
+    _dueSubscription = _dueRepo.watchPendingDues().listen(
+      (dues) {
+        if (mounted) {
+          setState(() {
+            _pendingDues = dues..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+          });
+        }
+      },
+    );
   }
 
   @override
   void dispose() {
     _accountSubscription?.cancel();
+    _transactionSubscription?.cancel();
+    _dueSubscription?.cancel();
     super.dispose();
   }
 
@@ -110,21 +142,28 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                   child: Text('No accounts found. Link a bank account to track balances.', style: AppTypography.bodyLg),
                 )
               else
-                ..._accounts.map((acc) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: InkWell(
-                        onTap: () => _showAccountOptionsModal(context, acc),
-                        borderRadius: BorderRadius.circular(12),
-                        child: _buildLinkedAccountCard(
-                          bankName: acc.bankName,
-                          accountType: acc.accountType,
-                          accountNumber: acc.maskedAccountNumber,
-                          balance: currencyFormatter.format(acc.currentBalance),
-                          accentColor: acc.accentColor,
-                          icon: Icons.account_balance,
-                        ),
+                ..._accounts.map((acc) {
+                  final now = DateTime.now();
+                  final accTx = _transactions.where((t) => t.accountId == acc.id).toList();
+                  final monthlyCredited = _analyticsService.calculateTotalIncome(accTx, month: now.month, year: now.year);
+                  
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: InkWell(
+                      onTap: () => _showAccountOptionsModal(context, acc),
+                      borderRadius: BorderRadius.circular(12),
+                      child: _buildLinkedAccountCard(
+                        bankName: acc.bankName,
+                        accountType: acc.accountType,
+                        accountNumber: acc.maskedAccountNumber,
+                        balance: currencyFormatter.format(acc.currentBalance),
+                        accentColor: acc.accentColor,
+                        icon: Icons.account_balance,
+                        subtitle: '+${currencyFormatter.format(monthlyCredited)} credited this month',
                       ),
-                    )),
+                    ),
+                  );
+                }),
               const SizedBox(height: AppSpacing.lg),
               _buildLinkAnotherBankButton(context),
               const SizedBox(height: 100),
@@ -242,15 +281,42 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                 child: const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 20),
               ),
               const SizedBox(width: AppSpacing.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Pending Dues', style: AppTypography.labelMuted),
-                  Text('\$345.50', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                ],
-              ),
+              Text('Pending Dues', style: AppTypography.labelMuted),
             ],
           ),
+          const SizedBox(height: AppSpacing.md),
+          if (_pendingDues.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text('No pending dues', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+            )
+          else
+            ..._pendingDues.where((d) => d.dueDate.isAfter(DateTime.now().subtract(const Duration(days: 1)))).map((due) {
+              final formatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+              final dateFormatter = DateFormat('dd MMM yyyy');
+              // Mask account number to just last 4 if present
+              String maskedAcc = due.accountId != null 
+                 ? '****${due.accountId!.split('_').last}' 
+                 : 'Unknown Account';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(formatter.format(due.amount), style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
+                        Text(maskedAcc, style: AppTypography.labelMuted),
+                        Text(due.description ?? 'Scheduled debit', style: AppTypography.labelMuted.copyWith(fontSize: 10)),
+                      ],
+                    ),
+                    Text(dateFormatter.format(due.dueDate), style: AppTypography.bodyMd.copyWith(color: AppColors.errorRed)),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );

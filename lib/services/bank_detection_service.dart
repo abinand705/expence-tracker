@@ -3,6 +3,7 @@ import '../models/account.dart';
 import '../models/sms_models.dart';
 import '../repositories/account_repository.dart';
 import '../utils/expense_parser.dart';
+import 'sms_account_resolver.dart';
 
 class BankDefinition {
   final String id;
@@ -102,18 +103,27 @@ class BankDetectionService {
     final Map<String, List<Message>> messagesByAccount = {};
     final Map<String, BankDefinition> accountBankMap = {};
 
+    final resolver = SmsAccountResolver();
+
     for (final entry in senderToMessages.entries) {
       final sender = entry.key;
       final messages = entry.value;
+
+      // Ensure chronological processing
+      messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
       for (final msg in messages) {
         final bank = identifyBank(sender, msg.text);
         if (bank == null) continue;
 
-        final last4 = ExpenseParser.extractAccountNumber(msg.text);
-        if (last4 == null || last4.isEmpty) continue;
+        final accountId = resolver.resolveAccountId(
+          sender: sender,
+          messageText: msg.text,
+          bank: bank,
+        );
+        
+        if (accountId == null) continue;
 
-        final accountId = '${bank.id}_$last4';
         messagesByAccount.putIfAbsent(accountId, () => []).add(msg);
         accountBankMap[accountId] = bank;
       }

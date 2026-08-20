@@ -20,7 +20,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   
   String _selectedFilter = 'All';
   String _searchQuery = '';
-  final List<String> _filters = ['All', 'UPI', 'Credit Card', 'Debits', 'Credits'];
+  final List<String> _filters = ['All', 'UPI', 'Debits', 'Credits'];
   
   List<Transaction> _allTransactions = [];
   bool _isLoading = true;
@@ -71,7 +71,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       if (_selectedFilter == 'All') return true;
       final msg = t.rawMessage?.toLowerCase() ?? '';
       if (_selectedFilter == 'UPI') return msg.contains('upi');
-      if (_selectedFilter == 'Credit Card') return msg.contains('cc') || msg.contains('card') || msg.contains('credit');
       if (_selectedFilter == 'Debits') return t.type == TransactionType.expense;
       if (_selectedFilter == 'Credits') return t.type == TransactionType.income;
       return true;

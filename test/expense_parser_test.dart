@@ -51,5 +51,21 @@ void main() {
       final cat2 = ExpenseParser.guessCategory('Amazon');
       expect(cat2, 'Shopping');
     });
+    
+    test('parsePendingDue extracts amount, date, and detects future debits', () {
+      final now = DateTime(2026, 8, 20);
+      final result = ExpenseParser.parsePendingDue('₹2,499 will be debited on 25 Aug', now);
+      expect(result, isNotNull);
+      expect(result!.amount, 2499.0);
+      expect(result.dueDate.year, 2026);
+      expect(result.dueDate.month, 8);
+      expect(result.dueDate.day, 25);
+    });
+    
+    test('parsePendingDue ignores past/completed debits', () {
+      final now = DateTime(2026, 8, 20);
+      final result = ExpenseParser.parsePendingDue('₹2,499 has been debited on 25 Aug', now);
+      expect(result, isNull);
+    });
   });
 }

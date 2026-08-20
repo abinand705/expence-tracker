@@ -4,6 +4,8 @@ import 'package:expense_tracker/services/sms_transaction_importer.dart';
 import 'package:expense_tracker/models/sms_models.dart';
 import 'package:expense_tracker/repositories/transaction_repository.dart';
 import 'package:expense_tracker/models/transaction.dart' as model_tx;
+import 'package:expense_tracker/repositories/pending_due_repository.dart';
+import 'package:expense_tracker/models/pending_due.dart';
 
 class MockTransactionRepository implements TransactionRepository {
   final Map<String, model_tx.Transaction> transactions = {};
@@ -32,14 +34,40 @@ class MockTransactionRepository implements TransactionRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class MockPendingDueRepository implements PendingDueRepository {
+  final Map<String, PendingDue> dues = {};
+
+  @override
+  Future<bool> addPendingDueIfAbsent(PendingDue due) async {
+    if (dues.containsKey(due.id)) return false;
+    dues[due.id] = due;
+    return true;
+  }
+
+  @override
+  Future<List<PendingDue>> getPendingDues() async {
+    return dues.values.toList();
+  }
+
+  @override
+  Future<void> deletePendingDue(String id) async {
+    dues.remove(id);
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   group('SmsTransactionImporter', () {
     late MockTransactionRepository repo;
+    late MockPendingDueRepository dueRepo;
     late SmsTransactionImporter importer;
 
     setUp(() {
       repo = MockTransactionRepository();
-      importer = SmsTransactionImporter(transactionRepo: repo);
+      dueRepo = MockPendingDueRepository();
+      importer = SmsTransactionImporter(transactionRepo: repo, pendingDueRepo: dueRepo);
     });
 
     test('imports valid expense sms', () async {

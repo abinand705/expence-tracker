@@ -46,5 +46,10 @@ void main() {
       expect(totals['Others'], 50.0);
       expect(totals['Income'], isNull); // Income should be ignored
     });
+
+    test('calculates total income correctly', () {
+      final total = analytics.calculateTotalIncome(testTransactions, month: now.month, year: now.year);
+      expect(total, 200.0);
+    });
   });
 }

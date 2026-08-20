@@ -51,6 +51,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Cached analytics
   double _totalBalance = 0.0;
   double _currentMonthSpend = 0.0;
+  double _currentMonthCredited = 0.0;
   double _spendChange = 0.0;
   List<Transaction> _recentTransactions = [];
 
@@ -68,12 +69,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           final lastMonthYear = now.month == 1 ? now.year - 1 : now.year;
           
           final currentSpend = _analyticsService.calculateTotalExpenses(transactions, month: now.month, year: now.year);
+          final currentCredited = _analyticsService.calculateTotalIncome(transactions, month: now.month, year: now.year);
           final lastSpend = _analyticsService.calculateTotalExpenses(transactions, month: lastMonth, year: lastMonthYear);
           final change = lastSpend == 0 ? 0.0 : ((currentSpend - lastSpend) / lastSpend) * 100;
           
           setState(() {
             _transactions = transactions;
             _currentMonthSpend = currentSpend;
+            _currentMonthCredited = currentCredited;
             _spendChange = change;
             _recentTransactions = transactions.take(3).toList();
           });
@@ -210,6 +213,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     BalanceCard(totalBalance: _totalBalance, formatter: currencyFormatter),
+                    const SizedBox(height: AppSpacing.md),
+                    Card(
+                      elevation: 0,
+                      color: AppColors.surfaceContainerLowest,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: AppColors.outlineVariant),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'This Month',
+                              style: AppTypography.labelCaps.copyWith(color: AppColors.outline),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Credited',
+                                  style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  currencyFormatter.format(_currentMonthCredited),
+                                  style: AppTypography.headlineMd.copyWith(
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: AppSpacing.md),
                     Row(
                       children: [

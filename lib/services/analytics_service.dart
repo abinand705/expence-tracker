@@ -12,6 +12,16 @@ class AnalyticsService {
     }).fold(0.0, (sum, t) => sum + t.amount);
   }
 
+  double calculateTotalIncome(List<Transaction> transactions, {int? month, int? year}) {
+    return transactions.where((t) {
+      if (t.type != TransactionType.income && t.amount <= 0) return false; // Count true incomes or positive amounts if type wasn't strictly categorized.
+      if (t.type == TransactionType.expense) return false; // Ensure it's not a debit.
+      if (month != null && t.date.month != month) return false;
+      if (year != null && t.date.year != year) return false;
+      return true;
+    }).fold(0.0, (sum, t) => sum + t.amount);
+  }
+
   Map<String, double> calculateCategoryTotals(List<Transaction> transactions, {int? month, int? year}) {
     Map<String, double> totals = {};
     for (var t in transactions) {

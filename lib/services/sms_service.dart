@@ -8,6 +8,8 @@ import '../models/message_settings.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart' as inbox;
 import '../services/bank_detection_service.dart';
 import '../utils/expense_parser.dart';
+import '../repositories/transaction_repository.dart';
+import '../services/sms_transaction_importer.dart';
 
 
 
@@ -273,14 +275,16 @@ class SmsService extends ChangeNotifier {
         debugPrint('[SmsService] financial messages selected: $totalBankMessages');
         debugPrint('[SmsService] excluded financial-looking messages: $excludedFinancialCount');
         try {
-          // Process asynchronously to discover accounts without blocking UI completely
-          bankDetectionService.processAllMessagesForDiscovery(allBankMessages).then((_) {
-            debugPrint('[SmsService] bank discovery completed');
-          }).catchError((e) {
-            debugPrint('[SmsService] bank discovery failed: $e');
-          });
+          // Process to discover accounts and import transactions
+          await bankDetectionService.processAllMessagesForDiscovery(allBankMessages);
+          debugPrint('[SmsService] bank discovery completed');
+          
+          final repo = TransactionRepository();
+          final importer = SmsTransactionImporter(transactionRepo: repo);
+          final summary = await importer.importAllBankMessages(_conversations);
+          debugPrint('[SmsService] transaction import completed: $summary');
         } catch (e) {
-          debugPrint('[SmsService] bank discovery failed: $e');
+          debugPrint('[SmsService] bank discovery or import failed: $e');
         }
       }
       
