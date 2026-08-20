@@ -23,13 +23,14 @@ class BudgetProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double targetRemaining = target - currentSpend;
-    
+    final cs = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onDoubleTap: onDoubleTap,
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.lg),
         decoration: BoxDecoration(
-          color: isWithinTarget ? AppColors.primary : AppColors.errorRed,
+          color: isWithinTarget ? cs.primary : AppColors.errorRed,
           borderRadius: BorderRadius.circular(AppRadius.xl),
           boxShadow: AppShadows.level1,
         ),
@@ -48,7 +49,7 @@ class BudgetProgressCard extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Row(
               children: [
-                Icon(isWithinTarget ? Icons.check_circle_outline : Icons.warning_amber_rounded, 
+                Icon(isWithinTarget ? Icons.check_circle_outline : Icons.warning_amber_rounded,
                   color: Colors.white, size: 14),
                 const SizedBox(width: 4),
                 Text(
@@ -63,3 +64,4 @@ class BudgetProgressCard extends StatelessWidget {
     );
   }
 }
+

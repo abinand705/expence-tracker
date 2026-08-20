@@ -8,6 +8,8 @@ import '../utils/expense_parser.dart';
 import 'sms_account_resolver.dart';
 import '../repositories/pending_due_repository.dart';
 import '../models/pending_due.dart';
+import '../models/account.dart';
+import '../repositories/account_repository.dart';
 
 enum SmsImportResult { imported, duplicate, skipped, failed }
 
@@ -30,30 +32,88 @@ class SmsTransactionImporter {
 
   SmsTransactionImporter({required this.transactionRepo, this.pendingDueRepo});
 
-  Future<SmsImportResult> importMessage(Message msg, String senderName, [SmsAccountResolver? resolver, PendingDueRepository? dueRepo]) async {
+  String? resolveTrueAccountId(String? preliminaryAccountId, String? last4, String bankId, List<Account>? existingAccounts) {
+    if (existingAccounts == null) return preliminaryAccountId;
+    
+    String? searchLast4 = last4;
+    if (searchLast4 == null && preliminaryAccountId != null && preliminaryAccountId.contains('_')) {
+      searchLast4 = preliminaryAccountId.split('_').last;
+    }
+    
+    if (searchLast4 == null || searchLast4.isEmpty) return null;
+
+    String normalizeSuffix(String s) => s.replaceAll(RegExp(r'[^0-9]'), '');
+    final normSearchLast4 = normalizeSuffix(searchLast4);
+    if (normSearchLast4.isEmpty) return null;
+
+    if (preliminaryAccountId != null) {
+      if (existingAccounts.any((a) => a.id == preliminaryAccountId)) {
+        return preliminaryAccountId;
+      }
+    }
+
+    final bankMatches = existingAccounts.where((a) {
+      final accNormSuffix = normalizeSuffix(a.accountNumber);
+      if (accNormSuffix.isEmpty) return false;
+      
+      bool suffixMatch = accNormSuffix == normSearchLast4 || 
+                         accNormSuffix.endsWith(normSearchLast4) || 
+                         normSearchLast4.endsWith(accNormSuffix);
+      if (!suffixMatch) return false;
+      
+      final normBankId = bankId.toLowerCase();
+      final normBankName = a.bankName.toLowerCase();
+      return a.id.startsWith('${bankId}_') || 
+             normBankName.contains(normBankId) || 
+             normBankId.contains(normBankName);
+    }).toList();
+
+    if (bankMatches.length == 1) {
+      return bankMatches.first.id;
+    } else if (bankMatches.length > 1) {
+      return null;
+    }
+
+    return preliminaryAccountId ?? '${bankId}_$searchLast4';
+  }
+
+  Future<SmsImportResult> importMessage(Message msg, String senderName, [SmsAccountResolver? resolver, PendingDueRepository? dueRepo, List<Account>? existingAccounts]) async {
     try {
-      final bank = BankDetectionService().identifyBank(senderName, msg.text);
+      final parsedDue = ExpenseParser.parsePendingDue(msg.text, msg.timestamp);
+      
+      var bank = BankDetectionService().identifyBank(senderName, msg.text);
+      if (parsedDue?.bankName != null) {
+        final explicitBank = BankDetectionService().identifyBank('', parsedDue!.bankName!);
+        if (explicitBank != null) bank = explicitBank;
+      }
+
       String? accountId;
       if (bank != null) {
-        if (resolver != null) {
+        String? last4;
+        if (parsedDue?.accountSuffix != null) {
+          last4 = parsedDue!.accountSuffix;
+          accountId = '${bank.id}_$last4';
+        } else if (resolver != null) {
           accountId = resolver.resolveAccountId(
             sender: senderName,
             messageText: msg.text,
             bank: bank,
           );
+          if (accountId != null) {
+            last4 = accountId.split('_').last;
+          }
         } else {
-          final last4 = ExpenseParser.extractAccountNumber(msg.text);
+          last4 = ExpenseParser.extractAccountNumber(msg.text);
           if (last4 != null && last4.isNotEmpty) {
             accountId = '${bank.id}_$last4';
           }
         }
+        accountId = resolveTrueAccountId(accountId, last4, bank.id, existingAccounts);
       }
 
-      final parsedDue = ExpenseParser.parsePendingDue(msg.text, msg.timestamp);
       if (parsedDue != null && dueRepo != null) {
-        final normalizedSender = senderName.trim().toLowerCase();
-        // Base the fingerprint on sender, date, amount, and account to deduplicate different reminder SMS messages.
-        final rawDueString = '${normalizedSender}_${parsedDue.dueDate.toUtc().toIso8601String()}_${parsedDue.amount}_${accountId ?? "unknown"}';
+        final normalizedDesc = (parsedDue.description ?? senderName).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+        final rawDueString = '${accountId ?? "unknown"}_${bank?.id ?? "unknown"}_${parsedDue.amount}_${parsedDue.dueDate.toUtc().toIso8601String()}_$normalizedDesc';
         final dueBytes = utf8.encode(rawDueString);
         final dueDigest = sha256.convert(dueBytes);
         final dueDeterministicId = 'due_${dueDigest.toString()}';
@@ -66,7 +126,7 @@ class SmsTransactionImporter {
           bankId: bank?.id,
           description: parsedDue.description ?? senderName,
           detectedAt: msg.timestamp,
-          source: 'sms',
+          source: parsedDue.source,
         );
         
         await dueRepo.addPendingDueIfAbsent(pendingDue);
@@ -124,6 +184,14 @@ class SmsTransactionImporter {
     // Default to a real repository if none provided (for prod usage).
     // In tests, pendingDueRepo will be injected or bypassed.
     final dueRepo = pendingDueRepo ?? PendingDueRepository();
+    final accountRepo = AccountRepository();
+    
+    List<Account> existingAccounts = [];
+    try {
+      existingAccounts = await accountRepo.getAccounts();
+    } catch (e) {
+      // Allow fallback if not authenticated
+    }
 
     for (var conv in conversations) {
       if (conv.isBankSender) {
@@ -132,7 +200,7 @@ class SmsTransactionImporter {
 
         for (var msg in sortedMessages) {
           summary.scanned++;
-          final result = await importMessage(msg, conv.senderName, resolver, dueRepo);
+          final result = await importMessage(msg, conv.senderName, resolver, dueRepo, existingAccounts);
           switch (result) {
             case SmsImportResult.imported:
               summary.imported++;

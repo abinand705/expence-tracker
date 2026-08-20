@@ -4,6 +4,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_distribution/firebase_app_distribution.dart' as fad;
 import 'package:firebase_app_distribution_platform_interface/firebase_app_distribution_platform_interface.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:open_filex/open_filex.dart';
+import 'dart:async';
+import 'public_update_provider.dart';
 
 enum UpdateCheckStatus {
   updateAvailable,
@@ -16,10 +21,20 @@ enum UpdateCheckStatus {
 
 class UpdateCheckResult {
   final UpdateCheckStatus status;
-  final AppDistributionRelease? release;
+  final PublicUpdateRelease? publicRelease;
+  final AppDistributionRelease? betaRelease;
   final String? errorMessage;
 
-  UpdateCheckResult({required this.status, this.release, this.errorMessage});
+  UpdateCheckResult({
+    required this.status, 
+    this.publicRelease, 
+    this.betaRelease, 
+    this.errorMessage
+  });
+}
+
+class AppConfig {
+  static const String updateMetadataUrl = 'https://moneytrack-demo.web.app/latest.json';
 }
 
 class AppUpdateService {
@@ -28,96 +43,121 @@ class AppUpdateService {
   AppUpdateService._internal();
 
   bool _hasPromptedThisSession = false;
-
   bool get hasPromptedThisSession => _hasPromptedThisSession;
-
   void markAsPrompted() {
     _hasPromptedThisSession = true;
   }
 
-  /// Checks if a newer release is available on Firebase App Distribution.
-  Future<UpdateCheckResult> checkForUpdate() async {
+  final StreamController<double> _downloadProgressController = StreamController<double>.broadcast();
+
+  /// Checks if a newer release is available publicly.
+  Future<UpdateCheckResult> checkForUpdate({bool checkBeta = false}) async {
     if (!Platform.isAndroid && !Platform.isIOS) {
       return UpdateCheckResult(status: UpdateCheckStatus.unknownError, errorMessage: 'Unsupported platform');
     }
 
-    try {
-      developer.log('Firebase App Distribution update check started', name: 'AppUpdateService');
-      
-      final isTesterSignedIn = await fad.isTesterSignedIn();
-      if (!isTesterSignedIn) {
-        developer.log('Tester not signed in, prompting sign in...', name: 'AppUpdateService');
-        await fad.signInTester();
-      }
+    if (checkBeta) {
+      return _checkBetaUpdate();
+    }
 
-      final release = await fad.checkForNewRelease();
-      developer.log('Firebase App Distribution update check succeeded. Release: ${release?.displayVersion}', name: 'AppUpdateService');
+    try {
+      developer.log('Public update check started', name: 'AppUpdateService');
+      final provider = PublicUpdateProvider(metadataUrl: AppConfig.updateMetadataUrl);
+      final release = await provider.checkUpdate();
       
       if (release != null) {
-        return UpdateCheckResult(status: UpdateCheckStatus.updateAvailable, release: release);
+        return UpdateCheckResult(status: UpdateCheckStatus.updateAvailable, publicRelease: release);
       } else {
         return UpdateCheckResult(status: UpdateCheckStatus.upToDate);
       }
     } catch (e, stackTrace) {
       developer.log(
-        'Firebase App Distribution update check failed',
+        'Public update check failed',
         name: 'AppUpdateService',
         error: e,
         stackTrace: stackTrace,
       );
 
       var status = UpdateCheckStatus.unknownError;
-      String? errorMessage = e.toString();
+      final stringError = e.toString().toLowerCase();
 
-      if (e is FirebaseException) {
-        final code = e.code.toLowerCase();
-        final message = e.message?.toLowerCase() ?? '';
-        
-        if (code.contains('network') || message.contains('network') || message.contains('connect') || message.contains('socket') || code == 'unavailable') {
-          status = UpdateCheckStatus.networkError;
-        } else if (code.contains('not-authorized') || code.contains('tester') || code.contains('unauthenticated') || message.contains('tester')) {
-          status = UpdateCheckStatus.notAuthorized;
-        } else if (code.contains('configuration') || code.contains('project') || code.contains('app-id') || code == 'not-found') {
-          status = UpdateCheckStatus.configurationError;
-        }
-      } else {
-        final stringError = e.toString().toLowerCase();
-        if (stringError.contains('network') || stringError.contains('socket') || stringError.contains('connect')) {
-          status = UpdateCheckStatus.networkError;
-        } else if (stringError.contains('tester') || stringError.contains('authoriz') || stringError.contains('authenticat')) {
-          status = UpdateCheckStatus.notAuthorized;
-        } else if (stringError.contains('project') || stringError.contains('config')) {
-          status = UpdateCheckStatus.configurationError;
-        }
+      if (stringError.contains('network') || stringError.contains('socket') || stringError.contains('connect') || stringError.contains('timeout')) {
+        status = UpdateCheckStatus.networkError;
+      } else if (stringError.contains('format') || stringError.contains('json')) {
+        status = UpdateCheckStatus.configurationError;
       }
 
-      return UpdateCheckResult(status: status, errorMessage: errorMessage);
+      return UpdateCheckResult(status: status, errorMessage: e.toString());
     }
   }
 
-  /// Downloads and initiates the installation of the provided release.
-  Future<void> performUpdate() async {
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      return;
+  Future<UpdateCheckResult> _checkBetaUpdate() async {
+    try {
+      final isTesterSignedIn = await fad.isTesterSignedIn();
+      if (!isTesterSignedIn) {
+        await fad.signInTester();
+      }
+      final release = await fad.checkForNewRelease();
+      if (release != null) {
+        return UpdateCheckResult(status: UpdateCheckStatus.updateAvailable, betaRelease: release);
+      } else {
+        return UpdateCheckResult(status: UpdateCheckStatus.upToDate);
+      }
+    } catch (e) {
+      return UpdateCheckResult(status: UpdateCheckStatus.notAuthorized, errorMessage: e.toString());
     }
+  }
+
+  /// Downloads and initiates the installation of the provided public release.
+  Future<void> performPublicUpdate(PublicUpdateRelease release) async {
+    if (!Platform.isAndroid) return;
 
     try {
-      await fad.updateApp();
-    } catch (e, stackTrace) {
-      developer.log(
-        'Firebase App Distribution perform update failed',
-        name: 'AppUpdateService',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      final url = Uri.parse(release.apkUrl);
+      final request = http.Request('GET', url);
+      final response = await http.Client().send(request);
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to download APK. Status: ${response.statusCode}');
+      }
+
+      final contentLength = response.contentLength ?? 0;
+      int downloaded = 0;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/moneytrack_update.apk');
+      final sink = file.openWrite();
+
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        downloaded += chunk.length;
+        if (contentLength > 0) {
+          _downloadProgressController.add(downloaded / contentLength);
+        }
+      }
+      await sink.close();
+      
+      developer.log('APK downloaded to ${file.path}', name: 'AppUpdateService');
+
+      final result = await OpenFilex.open(file.path);
+      if (result.type != ResultType.done) {
+        throw Exception('Failed to open installer: ${result.message}');
+      }
+    } catch (e) {
+      developer.log('Update installation failed', name: 'AppUpdateService', error: e);
       rethrow;
     }
   }
 
-  /// Stream of download progress for UI rendering.
-  Stream<AppDistributionDownloadProgress> get downloadProgress => fad.downloadProgress;
+  Stream<double> get publicDownloadProgress => _downloadProgressController.stream;
 
-  /// Utility to get current app version info.
+  Future<void> performBetaUpdate() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
+    await fad.updateApp();
+  }
+
+  Stream<AppDistributionDownloadProgress> get betaDownloadProgress => fad.downloadProgress;
+
   Future<PackageInfo> getAppVersionInfo() async {
     return await PackageInfo.fromPlatform();
   }

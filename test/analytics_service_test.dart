@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
 import 'package:expense_tracker/services/analytics_service.dart';
 import 'package:expense_tracker/models/transaction.dart';
 
@@ -50,6 +51,17 @@ void main() {
     test('calculates total income correctly', () {
       final total = analytics.calculateTotalIncome(testTransactions, month: now.month, year: now.year);
       expect(total, 200.0);
+    });
+
+    test('calculates expenses correctly with custom DateTimeRange', () {
+      final range = DateTimeRange(
+        start: now.subtract(const Duration(hours: 1)),
+        end: now.add(const Duration(hours: 1)),
+      );
+      
+      final total = analytics.calculateTotalExpenses(testTransactions, range: range);
+      // The old transaction (1 day ago) should be excluded
+      expect(total, 100.0);
     });
   });
 }

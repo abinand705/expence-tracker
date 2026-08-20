@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -15,12 +16,15 @@ import '../services/recurring_expense_service.dart';
 import '../models/transaction.dart';
 import '../models/account.dart';
 import '../models/budget.dart';
+import '../repositories/pending_due_repository.dart';
+import '../services/migration_service.dart';
 import '../widgets/dashboard/balance_card.dart';
 import '../widgets/dashboard/monthly_spending_card.dart';
 import '../widgets/dashboard/budget_progress_card.dart';
 import '../widgets/dashboard/spending_trend_card.dart';
 import '../widgets/dashboard/spend_categories_card.dart';
 import 'budget_settings_screen.dart';
+
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onSeeAllClicked;
 
@@ -54,6 +58,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _currentMonthCredited = 0.0;
   double _spendChange = 0.0;
   List<Transaction> _recentTransactions = [];
+  DateTimeRange? _expenseCycleRange;
+  StreamSubscription<Map<String, dynamic>?>? _userSubscription;
 
   static bool _hasProcessedRecurring = false;
 
@@ -64,26 +70,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _transactionSubscription = _transactionRepo.watchTransactions().listen(
       (transactions) {
         if (mounted) {
-          final now = DateTime.now();
-          final lastMonth = now.month == 1 ? 12 : now.month - 1;
-          final lastMonthYear = now.month == 1 ? now.year - 1 : now.year;
-          
-          final currentSpend = _analyticsService.calculateTotalExpenses(transactions, month: now.month, year: now.year);
-          final currentCredited = _analyticsService.calculateTotalIncome(transactions, month: now.month, year: now.year);
-          final lastSpend = _analyticsService.calculateTotalExpenses(transactions, month: lastMonth, year: lastMonthYear);
-          final change = lastSpend == 0 ? 0.0 : ((currentSpend - lastSpend) / lastSpend) * 100;
-          
           setState(() {
             _transactions = transactions;
-            _currentMonthSpend = currentSpend;
-            _currentMonthCredited = currentCredited;
-            _spendChange = change;
             _recentTransactions = transactions.take(3).toList();
           });
+          _updateAnalytics();
         }
       },
       onError: (e) {}
     );
+    
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      _userSubscription = _userRepo.watchProfile(uid).listen(
+        (profile) {
+          if (mounted) {
+            _updateExpenseCycle(profile);
+          }
+        },
+        onError: (e) {}
+      );
+    }
     _accountSubscription = _accountRepo.watchAccounts().listen(
       (accounts) {
         if (mounted) {
@@ -110,11 +117,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  void _updateExpenseCycle(Map<String, dynamic>? profile) {
+    final cycle = profile?['expenseCycle'] as String? ?? 'monthly';
+    final customDays = profile?['customCycleDays'] as int? ?? 14;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    DateTime start;
+    switch (cycle) {
+      case 'daily': start = today; break;
+      case 'weekly': start = today.subtract(Duration(days: today.weekday - 1)); break;
+      case 'quarterly': start = DateTime(today.year, ((today.month - 1) ~/ 3) * 3 + 1, 1); break;
+      case 'yearly': start = DateTime(today.year, 1, 1); break;
+      case 'custom': start = today.subtract(Duration(days: customDays - 1)); break;
+      case 'monthly':
+      default:
+        start = DateTime(today.year, today.month, 1);
+        break;
+    }
+    setState(() {
+      _expenseCycleRange = DateTimeRange(start: start, end: end);
+    });
+    _updateAnalytics();
+  }
+
+  void _updateAnalytics() {
+    if (_transactions.isEmpty) return;
+    
+    final now = DateTime.now();
+    final lastMonth = now.month == 1 ? 12 : now.month - 1;
+    final lastMonthYear = now.month == 1 ? now.year - 1 : now.year;
+    
+    // Expenses follow custom cycle if available, otherwise fallback to current month
+    final currentSpend = _expenseCycleRange != null 
+        ? _analyticsService.calculateTotalExpenses(_transactions, range: _expenseCycleRange)
+        : _analyticsService.calculateTotalExpenses(_transactions, month: now.month, year: now.year);
+    
+    // Credited strictly follows calendar month
+    final currentCredited = _analyticsService.calculateTotalIncome(_transactions, month: now.month, year: now.year);
+    
+    final lastSpend = _analyticsService.calculateTotalExpenses(_transactions, month: lastMonth, year: lastMonthYear);
+    final change = lastSpend == 0 ? 0.0 : ((currentSpend - lastSpend) / lastSpend) * 100;
+    
+    setState(() {
+      _currentMonthSpend = currentSpend;
+      _currentMonthCredited = currentCredited;
+      _spendChange = change;
+    });
+  }
+
   @override
   void dispose() {
     _transactionSubscription?.cancel();
     _accountSubscription?.cancel();
     _budgetSubscription?.cancel();
+    _userSubscription?.cancel();
     super.dispose();
   }
 
@@ -125,6 +184,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _hasProcessedRecurring = true;
       try {
         await RecurringExpenseService().processDueExpenses();
+        final migrationService = MigrationService(
+          transactionRepo: _transactionRepo,
+          pendingDueRepo: PendingDueRepository(),
+          accountRepo: _accountRepo,
+        );
+        await migrationService.runCanonicalAccountMigration();
       } catch (e) {
         // Continue if it fails, don't crash dashboard
       }

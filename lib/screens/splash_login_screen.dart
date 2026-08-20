@@ -114,22 +114,23 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
     bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant)),
+        Text(label, style: AppTypography.labelCaps.copyWith(color: cs.onSurfaceVariant)),
         const SizedBox(height: AppSpacing.xs),
         Container(
           decoration: BoxDecoration(
-            color: AppColors.surfaceBright,
+            color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(AppRadius.base),
-            border: Border.all(color: AppColors.surfaceVariant),
+            border: Border.all(color: cs.outlineVariant),
           ),
           child: Row(
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Icon(icon, color: AppColors.outline),
+                child: Icon(icon, color: cs.outline),
               ),
               Expanded(
                 child: TextField(
@@ -138,7 +139,7 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                   keyboardType: keyboardType,
                   decoration: InputDecoration(
                     hintText: 'Enter your $label'.toLowerCase(),
-                    hintStyle: AppTypography.bodyLg.copyWith(color: AppColors.outlineVariant),
+                    hintStyle: AppTypography.bodyLg.copyWith(color: cs.outline),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 14),
                   ),
@@ -154,8 +155,8 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppColors.background,
       body: Stack(
         children: [
           Positioned(
@@ -188,10 +189,10 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLowest.withValues(alpha: 0.7),
+                  color: cs.surface.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(AppRadius.lg),
                   boxShadow: AppShadows.level1,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -206,9 +207,9 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                       child: const Icon(Icons.account_balance_wallet, color: AppColors.onPrimary, size: 32),
                     ),
                     const SizedBox(height: AppSpacing.md),
-                    Text('MoneyTrack', style: AppTypography.displayCurrency.copyWith(color: AppColors.primary)),
+                    Text('MoneyTrack', style: AppTypography.displayCurrency.copyWith(color: cs.primaryContainer)),
                     const SizedBox(height: AppSpacing.xs),
-                    Text(_isLogin ? 'Welcome back' : 'Create an account', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+                    Text(_isLogin ? 'Welcome back' : 'Create an account', style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant)),
                     const SizedBox(height: AppSpacing.xl),
                     
                     if (!_isLogin) ...[
@@ -226,7 +227,7 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                         alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: _isLoading ? null : _resetPassword,
-                          child: Text('Forgot Password?', style: AppTypography.labelCaps.copyWith(color: AppColors.primary)),
+                          child: Text('Forgot Password?', style: AppTypography.labelCaps.copyWith(color: cs.primaryContainer)),
                         ),
                       )
                     else
@@ -262,12 +263,12 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     Row(
                       children: [
-                        const Expanded(child: Divider(color: AppColors.surfaceVariant)),
+                        const Expanded(child: Divider()),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                          child: Text('OR', style: AppTypography.labelMuted.copyWith(color: AppColors.outline)),
+                          child: Text('OR', style: AppTypography.labelMuted.copyWith(color: cs.outline)),
                         ),
-                        const Expanded(child: Divider(color: AppColors.surfaceVariant)),
+                        const Expanded(child: Divider()),
                       ],
                     ),
                     const SizedBox(height: AppSpacing.lg),
@@ -293,8 +294,8 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                           }
                         },
                         style: OutlinedButton.styleFrom(
-                          backgroundColor: AppColors.surfaceBright,
-                          side: const BorderSide(color: AppColors.surfaceVariant),
+                          backgroundColor: cs.surfaceContainerLow,
+                          side: BorderSide(color: cs.outlineVariant),
                           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.base)),
                         ),
@@ -303,7 +304,7 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                           children: [
                             const Text('G', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 20)),
                             const SizedBox(width: AppSpacing.md),
-                            Text('Continue with Google', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface)),
+                            Text('Continue with Google', style: AppTypography.bodyLg.copyWith(color: cs.onSurface)),
                           ],
                         ),
                       ),
@@ -313,7 +314,7 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_isLogin ? 'Don\'t have an account?' : 'Already have an account?', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+                        Text(_isLogin ? 'Don\'t have an account?' : 'Already have an account?', style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant)),
                         const SizedBox(width: AppSpacing.xs),
                         GestureDetector(
                           onTap: () {
@@ -322,8 +323,8 @@ class _SplashLoginScreenState extends State<SplashLoginScreen> {
                             });
                           },
                           child: Text(
-                            _isLogin ? 'Sign up' : 'Login', 
-                            style: AppTypography.headlineMd.copyWith(color: AppColors.primary, decoration: TextDecoration.underline)
+                            _isLogin ? 'Sign up' : 'Login',
+                            style: AppTypography.headlineMd.copyWith(color: cs.primaryContainer, decoration: TextDecoration.underline)
                           ),
                         ),
                       ],

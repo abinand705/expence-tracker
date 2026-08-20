@@ -231,8 +231,12 @@ class SmsService extends ChangeNotifier {
         msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
         
         // simple bank heuristic (ExpenseParser handles deep filtering)
-        // We expand the regex to support longer sender IDs with multiple hyphens (e.g., JD-BOBSMS-S)
         final isBank = RegExp(r'^[a-zA-Z]{2}-?[a-zA-Z0-9\-]{4,12}$').hasMatch(address) || address.toLowerCase().contains('bank');
+        
+        bool isFinancialMessage = isBank;
+        if (!isFinancialMessage) {
+          isFinancialMessage = msgs.any((m) => ExpenseParser.isStrongFinancialMessage(m.text));
+        }
         
         final conv = Conversation(
           id: address,
@@ -240,7 +244,7 @@ class SmsService extends ChangeNotifier {
           senderNumber: address,
           avatarColor: colors[colorIndex % colors.length],
           messages: msgs,
-          isBankSender: isBank,
+          isBankSender: isFinancialMessage,
         );
 
         if (isBank) {

@@ -61,6 +61,29 @@ void main() {
       expect(result.dueDate.month, 8);
       expect(result.dueDate.day, 25);
     });
+
+    test('parsePendingDue parses specific SIP pattern', () {
+      final now = DateTime(2026, 8, 20);
+      final msg = "Rs 100.00 will be debited on 21 Aug 2026 from your 0711-BANK OF BARODA for upcoming SIP #xxxxxxxx in HDFC Small Cap Fund Growth Dir. Ensure you have sufficient balance in your bank account.";
+      final result = ExpenseParser.parsePendingDue(msg, now);
+      expect(result, isNotNull);
+      expect(result!.amount, 100.0);
+      expect(result.dueDate.year, 2026);
+      expect(result.dueDate.month, 8);
+      expect(result.dueDate.day, 21);
+      expect(result.accountSuffix, '0711');
+      expect(result.bankName, 'BANK OF BARODA');
+      expect(result.description, 'Upcoming SIP - HDFC Small Cap Fund Growth Dir');
+      expect(result.source, 'sms');
+    });
+
+    test('isStrongFinancialMessage correctly identifies financial messages', () {
+      final msg1 = "Rs 100.00 will be debited on 21 Aug 2026 from your 0711-BANK OF BARODA for upcoming SIP #xxxxxxxx in HDFC Small Cap Fund Growth Dir.";
+      expect(ExpenseParser.isStrongFinancialMessage(msg1), isTrue);
+
+      final msg2 = "Your food will be delivered on 25 Aug 2026.";
+      expect(ExpenseParser.isStrongFinancialMessage(msg2), isFalse);
+    });
     
     test('parsePendingDue ignores past/completed debits', () {
       final now = DateTime(2026, 8, 20);

@@ -43,9 +43,9 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
 
   void _calculateTrendData() {
     _trendData = widget.analyticsService.calculateTrendData(
-      widget.transactions, 
-      _selectedTrendPeriod, 
-      DateTime.now(), 
+      widget.transactions,
+      _selectedTrendPeriod,
+      DateTime.now(),
       _customDateRange,
     );
   }
@@ -62,13 +62,14 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final filters = TrendPeriod.values;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: AppShadows.level1,
       ),
@@ -77,7 +78,7 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
         children: [
           Text(
             'Spending Trends',
-            style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
+            style: AppTypography.headlineMd.copyWith(color: cs.primaryContainer),
           ),
           const SizedBox(height: AppSpacing.lg),
           SingleChildScrollView(
@@ -98,10 +99,9 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
                           builder: (context, child) {
                             return Theme(
                               data: Theme.of(context).copyWith(
-                                colorScheme: const ColorScheme.light(
-                                  primary: AppColors.primary,
+                                colorScheme: Theme.of(context).colorScheme.copyWith(
+                                  primary: cs.primaryContainer,
                                   onPrimary: Colors.white,
-                                  onSurface: AppColors.onSurface,
                                 ),
                               ),
                               child: child!,
@@ -125,13 +125,13 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.surfaceContainer,
+                        color: isSelected ? cs.primary : cs.surfaceContainerHigh,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         _getFilterName(filter),
                         style: AppTypography.bodyMd.copyWith(
-                          color: isSelected ? AppColors.onPrimary : AppColors.onSurfaceVariant,
+                          color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
                           fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                         ),
                       ),
@@ -147,6 +147,10 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
             child: CustomPaint(
               painter: TrendChartPainter(
                 dataPoints: _trendData,
+                // Pass theme colors explicitly — CustomPainter has no BuildContext
+                lineColor: cs.primaryContainer,
+                gridColor: cs.outlineVariant,
+                labelColor: cs.outline,
               ),
               size: const Size(double.infinity, 150),
             ),
@@ -159,17 +163,25 @@ class _SpendingTrendCardState extends State<SpendingTrendCard> {
 
 class TrendChartPainter extends CustomPainter {
   final List<TrendData> dataPoints;
-  
-  TrendChartPainter({required this.dataPoints});
+  final Color lineColor;
+  final Color gridColor;
+  final Color labelColor;
+
+  TrendChartPainter({
+    required this.dataPoints,
+    required this.lineColor,
+    required this.gridColor,
+    required this.labelColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (dataPoints.isEmpty) return;
 
     final paintGrid = Paint()
-      ..color = AppColors.surfaceContainerHigh
+      ..color = gridColor
       ..strokeWidth = 1;
-    final textStyle = AppTypography.labelMuted.copyWith(fontSize: 10, color: AppColors.outline);
+    final textStyle = AppTypography.labelMuted.copyWith(fontSize: 10, color: labelColor);
 
     // Calculate Max Y
     double maxVal = dataPoints.fold(0.0, (m, v) => v.amount > m ? v.amount : m);
@@ -184,11 +196,11 @@ class TrendChartPainter extends CustomPainter {
     ];
 
     final startX = 35.0; // Extra room for Y-axis labels
-    
+
     for (int i = 0; i < 3; i++) {
       final y = (size.height - 30) * (i / 3) + 20;
       canvas.drawLine(Offset(startX, y), Offset(size.width, y), paintGrid);
-      
+
       final textSpan = TextSpan(text: yLabels[i], style: textStyle);
       final textPainter = TextPainter(text: textSpan, textDirection: ui.TextDirection.ltr);
       textPainter.layout();
@@ -197,14 +209,14 @@ class TrendChartPainter extends CustomPainter {
 
     final path = Path();
     final paintLine = Paint()
-      ..color = AppColors.primaryContainer
+      ..color = lineColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
     final stepX = dataPoints.length > 1 ? (size.width - startX) / (dataPoints.length - 1) : 0.0;
-    
+
     // Draw X labels
     for (int i = 0; i < dataPoints.length; i++) {
       // Don't clutter X labels if too many points
@@ -219,7 +231,7 @@ class TrendChartPainter extends CustomPainter {
       double renderX = x - (textPainter.width / 2);
       if (renderX < startX) renderX = startX;
       if (renderX + textPainter.width > size.width) renderX = size.width - textPainter.width;
-      
+
       textPainter.paint(canvas, Offset(renderX, size.height - 15));
     }
 
@@ -232,20 +244,20 @@ class TrendChartPainter extends CustomPainter {
 
     if (normalizedData.isNotEmpty) {
       path.moveTo(startX, mapY(normalizedData[0]));
-      
+
       for (int i = 0; i < normalizedData.length - 1; i++) {
         final p0 = Offset(startX + i * stepX, mapY(normalizedData[i]));
         final p1 = Offset(startX + (i + 1) * stepX, mapY(normalizedData[i + 1]));
-        
+
         final controlPointX = p0.dx + (p1.dx - p0.dx) / 2;
-        
+
         path.cubicTo(
           controlPointX, p0.dy,
           controlPointX, p1.dy,
           p1.dx, p1.dy,
         );
       }
-      
+
       canvas.drawPath(path, paintLine);
     }
   }
@@ -253,8 +265,9 @@ class TrendChartPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant TrendChartPainter oldDelegate) {
     if (oldDelegate.dataPoints.length != dataPoints.length) return true;
-    for (int i=0; i<dataPoints.length; i++) {
-      if (oldDelegate.dataPoints[i].amount != dataPoints[i].amount || 
+    if (oldDelegate.lineColor != lineColor || oldDelegate.gridColor != gridColor) return true;
+    for (int i = 0; i < dataPoints.length; i++) {
+      if (oldDelegate.dataPoints[i].amount != dataPoints[i].amount ||
           oldDelegate.dataPoints[i].label != dataPoints[i].label) {
         return true;
       }

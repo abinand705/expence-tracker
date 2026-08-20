@@ -7,12 +7,12 @@ import '../theme/app_typography.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class UpdateDialog extends StatefulWidget {
-  final AppDistributionRelease release;
+  final UpdateCheckResult checkResult;
   final PackageInfo currentPackageInfo;
 
   const UpdateDialog({
     super.key,
-    required this.release,
+    required this.checkResult,
     required this.currentPackageInfo,
   });
 
@@ -27,6 +27,13 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final publicRelease = widget.checkResult.publicRelease;
+    final betaRelease = widget.checkResult.betaRelease;
+    
+    final displayVersion = publicRelease?.version ?? betaRelease?.displayVersion ?? 'Unknown';
+    final buildVersion = publicRelease?.buildNumber.toString() ?? betaRelease?.buildVersion ?? '';
+    final releaseNotes = publicRelease?.releaseNotes ?? betaRelease?.releaseNotes;
+
     return AlertDialog(
       backgroundColor: AppColors.surfaceContainerLowest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
@@ -40,12 +47,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
             const SizedBox(height: AppSpacing.sm),
             Text('Current version:\n${widget.currentPackageInfo.version}+${widget.currentPackageInfo.buildNumber}', style: AppTypography.bodyMd),
             const SizedBox(height: AppSpacing.sm),
-            Text('New version:\n${widget.release.displayVersion}+${widget.release.buildVersion ?? ""}', style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
-            if (widget.release.releaseNotes != null && widget.release.releaseNotes!.isNotEmpty) ...[
+            Text('New version:\n$displayVersion+$buildVersion', style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
+            if (releaseNotes != null && releaseNotes.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
               Text('What\'s new:', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: AppSpacing.xs),
-              Text(widget.release.releaseNotes!, style: AppTypography.bodyMd),
+              Text(releaseNotes, style: AppTypography.bodyMd),
             ],
             if (_error != null) ...[
               const SizedBox(height: AppSpacing.md),
@@ -69,13 +76,13 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   ),
                 ),
               const SizedBox(height: AppSpacing.sm),
-              Text('To install this test update, Android may ask you to allow MoneyTrack to install unknown apps.', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
+              Text('To install this update, Android may ask you to allow MoneyTrack to install unknown apps.', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
             ],
           ],
         ),
       ),
       actions: _isDownloading
-          ? [] // Disable actions while downloading
+          ? [] 
           : [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -100,20 +107,26 @@ class _UpdateDialogState extends State<UpdateDialog> {
       _error = null;
     });
 
-    final sub = AppUpdateService().downloadProgress.listen((progress) {
+    final isPublic = widget.checkResult.publicRelease != null;
+    final stream = isPublic 
+        ? AppUpdateService().publicDownloadProgress 
+        : AppUpdateService().betaDownloadProgress.map((p) => p.apkFileTotalBytes > 0 ? (p.apkBytesDownloaded / p.apkFileTotalBytes) : 0.0);
+
+    final sub = stream.listen((progress) {
       if (mounted) {
         setState(() {
-          if (progress.apkFileTotalBytes > 0) {
-            _progress = progress.apkBytesDownloaded / progress.apkFileTotalBytes;
-          }
+          _progress = progress;
         });
       }
     });
 
     try {
-      await AppUpdateService().performUpdate();
-      // After performUpdate finishes on Android, it triggers native install prompt.
-      // If the user returns, we can pop.
+      if (isPublic) {
+        await AppUpdateService().performPublicUpdate(widget.checkResult.publicRelease!);
+      } else {
+        await AppUpdateService().performBetaUpdate();
+      }
+      
       if (mounted) {
          Navigator.of(context).pop(true);
       }
@@ -121,7 +134,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       if (mounted) {
         setState(() {
           _isDownloading = false;
-          _error = 'Unable to check for updates. Please check your internet connection and try again.';
+          _error = 'Unable to reach the update server. Please check your internet connection and try again.';
         });
       }
     } finally {

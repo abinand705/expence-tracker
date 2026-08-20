@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../models/transaction.dart';
@@ -9,11 +8,13 @@ import '../../services/analytics_service.dart';
 class SpendCategoriesCard extends StatefulWidget {
   final List<Transaction> transactions;
   final AnalyticsService analyticsService;
+  final DateTimeRange? expenseCycleRange;
 
   const SpendCategoriesCard({
     super.key,
     required this.transactions,
     required this.analyticsService,
+    this.expenseCycleRange,
   });
 
   @override
@@ -39,16 +40,22 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
 
   void _calculateTotals() {
     final now = DateTime.now();
-    _totals = widget.analyticsService.calculateCategoryTotals(
-      widget.transactions,
-      month: now.month,
-      year: now.year,
-    );
+    _totals = widget.expenseCycleRange != null
+      ? widget.analyticsService.calculateCategoryTotals(
+          widget.transactions,
+          range: widget.expenseCycleRange,
+        )
+      : widget.analyticsService.calculateCategoryTotals(
+          widget.transactions,
+          month: now.month,
+          year: now.year,
+        );
   }
 
   @override
   Widget build(BuildContext context) {
-    
+    final cs = Theme.of(context).colorScheme;
+
     double food = _totals['Food'] ?? 0;
     double shopping = _totals['Shopping'] ?? 0;
     double bills = _totals['Bills'] ?? 0;
@@ -57,7 +64,7 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
     double total = food + shopping + bills + others;
     final displayTotal = total;
     if (total == 0) total = 1; // prevent divide by zero
-    
+
     final pFood = food / total;
     final pShop = shopping / total;
     final pBills = bills / total;
@@ -67,7 +74,7 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: AppShadows.level1,
       ),
@@ -76,7 +83,7 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
         children: [
           Text(
             'Spend Categories',
-            style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
+            style: AppTypography.headlineMd.copyWith(color: cs.primaryContainer),
           ),
           const SizedBox(height: AppSpacing.xl),
           Row(
@@ -86,9 +93,9 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
                 height: 120,
                 child: CustomPaint(
                   painter: DonutChartPainter(
-                    foodPct: pFood, 
-                    shopPct: pShop, 
-                    billsPct: pBills, 
+                    foodPct: pFood,
+                    shopPct: pShop,
+                    billsPct: pBills,
                     othersPct: pOthers
                   ),
                   child: Center(
@@ -97,11 +104,11 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
                       children: [
                         Text(
                           'Total',
-                          style: AppTypography.labelMuted.copyWith(fontSize: 10),
+                          style: AppTypography.labelMuted.copyWith(fontSize: 10, color: cs.onSurfaceVariant),
                         ),
                         Text(
                           displayTotal >= 1000 ? '${(displayTotal/1000).toStringAsFixed(1)}k' : displayTotal.toStringAsFixed(0),
-                          style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold),
+                          style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface),
                         ),
                       ],
                     ),
@@ -113,22 +120,22 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
                 child: Column(
                   children: [
                     if (pFood > 0) ...[
-                      _buildLegendItem('Food', '${(pFood * 100).toStringAsFixed(0)}%', const Color(0xFFC2185B)),
+                      _buildLegendItem(context, 'Food', '${(pFood * 100).toStringAsFixed(0)}%', const Color(0xFFC2185B)),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     if (pShop > 0) ...[
-                      _buildLegendItem('Shopping', '${(pShop * 100).toStringAsFixed(0)}%', const Color(0xFF7B1FA2)),
+                      _buildLegendItem(context, 'Shopping', '${(pShop * 100).toStringAsFixed(0)}%', const Color(0xFF7B1FA2)),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     if (pBills > 0) ...[
-                      _buildLegendItem('Bills', '${(pBills * 100).toStringAsFixed(0)}%', const Color(0xFF1976D2)),
+                      _buildLegendItem(context, 'Bills', '${(pBills * 100).toStringAsFixed(0)}%', const Color(0xFF1976D2)),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     if (pOthers > 0) ...[
-                      _buildLegendItem('Others', '${(pOthers * 100).toStringAsFixed(0)}%', const Color(0xFFF57C00)),
+                      _buildLegendItem(context, 'Others', '${(pOthers * 100).toStringAsFixed(0)}%', const Color(0xFFF57C00)),
                     ],
                     if (displayTotal == 0)
-                      Text('No data this month', style: AppTypography.labelMuted),
+                      Text('No data this month', style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -139,7 +146,8 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
     );
   }
 
-  Widget _buildLegendItem(String title, String percentage, Color color) {
+  Widget _buildLegendItem(BuildContext context, String title, String percentage, Color color) {
+    final cs = Theme.of(context).colorScheme;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -156,18 +164,19 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
             const SizedBox(width: AppSpacing.sm),
             Text(
               title,
-              style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
             ),
           ],
         ),
         Text(
           percentage,
-          style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+          style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
         ),
       ],
     );
   }
 }
+
 
 class DonutChartPainter extends CustomPainter {
   final double foodPct;

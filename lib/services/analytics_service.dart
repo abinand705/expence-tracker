@@ -1,33 +1,88 @@
 import 'package:flutter/material.dart';
 import '../models/transaction.dart';
 import '../models/trend_data.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../repositories/user_repository.dart';
 
 class AnalyticsService {
-  double calculateTotalExpenses(List<Transaction> transactions, {int? month, int? year}) {
+  Future<DateTimeRange?> getExpenseCycleDateRange() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return null;
+
+    final profile = await UserRepository().getProfile(uid);
+    final cycle = profile?['expenseCycle'] as String? ?? 'monthly';
+    final customDays = profile?['customCycleDays'] as int? ?? 14;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    DateTime start;
+    switch (cycle) {
+      case 'daily':
+        start = today;
+        break;
+      case 'weekly':
+        // Monday is 1, Sunday is 7
+        final offset = today.weekday - 1;
+        start = today.subtract(Duration(days: offset));
+        break;
+      case 'quarterly':
+        final quarterMonth = ((today.month - 1) ~/ 3) * 3 + 1;
+        start = DateTime(today.year, quarterMonth, 1);
+        break;
+      case 'yearly':
+        start = DateTime(today.year, 1, 1);
+        break;
+      case 'custom':
+        start = today.subtract(Duration(days: customDays - 1));
+        break;
+      case 'monthly':
+      default:
+        start = DateTime(today.year, today.month, 1);
+        break;
+    }
+
+    return DateTimeRange(start: start, end: end);
+  }
+  double calculateTotalExpenses(List<Transaction> transactions, {int? month, int? year, DateTimeRange? range}) {
     return transactions.where((t) {
       if (t.type != TransactionType.expense) return false;
-      if (month != null && t.date.month != month) return false;
-      if (year != null && t.date.year != year) return false;
+      if (range != null) {
+        if (t.date.isBefore(range.start) || t.date.isAfter(range.end)) return false;
+      } else {
+        if (month != null && t.date.month != month) return false;
+        if (year != null && t.date.year != year) return false;
+      }
       return true;
     }).fold(0.0, (sum, t) => sum + t.amount);
   }
 
-  double calculateTotalIncome(List<Transaction> transactions, {int? month, int? year}) {
+  double calculateTotalIncome(List<Transaction> transactions, {int? month, int? year, DateTimeRange? range}) {
     return transactions.where((t) {
       if (t.type != TransactionType.income && t.amount <= 0) return false; // Count true incomes or positive amounts if type wasn't strictly categorized.
       if (t.type == TransactionType.expense) return false; // Ensure it's not a debit.
-      if (month != null && t.date.month != month) return false;
-      if (year != null && t.date.year != year) return false;
+      if (range != null) {
+        if (t.date.isBefore(range.start) || t.date.isAfter(range.end)) return false;
+      } else {
+        if (month != null && t.date.month != month) return false;
+        if (year != null && t.date.year != year) return false;
+      }
       return true;
     }).fold(0.0, (sum, t) => sum + t.amount);
   }
 
-  Map<String, double> calculateCategoryTotals(List<Transaction> transactions, {int? month, int? year}) {
+  Map<String, double> calculateCategoryTotals(List<Transaction> transactions, {int? month, int? year, DateTimeRange? range}) {
     Map<String, double> totals = {};
     for (var t in transactions) {
       if (t.type != TransactionType.expense) continue;
-      if (month != null && t.date.month != month) continue;
-      if (year != null && t.date.year != year) continue;
+      
+      if (range != null) {
+        if (t.date.isBefore(range.start) || t.date.isAfter(range.end)) continue;
+      } else {
+        if (month != null && t.date.month != month) continue;
+        if (year != null && t.date.year != year) continue;
+      }
 
       totals[t.category] = (totals[t.category] ?? 0) + t.amount;
     }

@@ -6,6 +6,7 @@ import 'package:expense_tracker/repositories/transaction_repository.dart';
 import 'package:expense_tracker/models/transaction.dart' as model_tx;
 import 'package:expense_tracker/repositories/pending_due_repository.dart';
 import 'package:expense_tracker/models/pending_due.dart';
+import 'package:expense_tracker/models/account.dart';
 
 class MockTransactionRepository implements TransactionRepository {
   final Map<String, model_tx.Transaction> transactions = {};
@@ -179,6 +180,73 @@ void main() {
       expect(summary.scanned, 0);
       expect(summary.imported, 0);
       expect(repo.transactions.length, 0);
+    });
+
+    test('TEST 1 - Canonical mapping maps to random_uid', () async {
+      final msg = Message(
+        id: 'canonical_1',
+        text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
+        timestamp: DateTime(2026, 1, 1),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'random_uid', name: 'HDFC', bankName: 'HDFC', accountNumber: '1234', accountType: 'Savings', accentColor: const Color(0xFF000000))
+      ];
+      final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      expect(savedTx.accountId, 'random_uid');
+    });
+
+    test('TEST 2 - PendingDue mapping maps to random_uid', () async {
+      final msg = Message(
+        id: 'canonical_2',
+        text: 'Upcoming EMI of Rs. 5000 due on 15-01-2026 from a/c 1234',
+        timestamp: DateTime(2026, 1, 1),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'random_uid', name: 'HDFC', bankName: 'HDFC', accountNumber: '1234', accountType: 'Savings', accentColor: const Color(0xFF000000))
+      ];
+      final result = await importer.importMessage(msg, 'HDFC Bank', null, dueRepo, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedDue = dueRepo.dues.values.last;
+      expect(savedDue.accountId, 'random_uid');
+    });
+
+    test('TEST 4 - Ambiguous accounts leaves accountId null', () async {
+      final msg = Message(
+        id: 'canonical_4',
+        text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
+        timestamp: DateTime(2026, 1, 1),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'acc1', name: 'HDFC1', bankName: 'HDFC', accountNumber: '1234', accountType: 'Savings', accentColor: const Color(0xFF000000)),
+        Account(id: 'acc2', name: 'HDFC2', bankName: 'HDFC', accountNumber: '1234', accountType: 'Current', accentColor: const Color(0xFF000000))
+      ];
+      final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      expect(savedTx.accountId, isNull);
+    });
+
+    test('TEST 5 - Different bank does not map', () async {
+      final msg = Message(
+        id: 'canonical_5',
+        text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
+        timestamp: DateTime(2026, 1, 1),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'random_uid', name: 'SBI', bankName: 'SBI', accountNumber: '1234', accountType: 'Savings', accentColor: const Color(0xFF000000))
+      ];
+      // Detected bank is HDFC based on sender
+      final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      // It will create the hdfc_1234 preliminary id instead of matching random_uid
+      expect(savedTx.accountId, 'hdfc_1234');
     });
   });
 }

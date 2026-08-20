@@ -143,10 +143,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                 )
               else
                 ..._accounts.map((acc) {
-                  final now = DateTime.now();
-                  final accTx = _transactions.where((t) => t.accountId == acc.id).toList();
-                  final monthlyCredited = _analyticsService.calculateTotalIncome(accTx, month: now.month, year: now.year);
-                  
                   return Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: InkWell(
@@ -159,7 +155,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                         balance: currencyFormatter.format(acc.currentBalance),
                         accentColor: acc.accentColor,
                         icon: Icons.account_balance,
-                        subtitle: '+${currencyFormatter.format(monthlyCredited)} credited this month',
                       ),
                     ),
                   );
@@ -246,30 +241,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.successGreen.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.trending_up, color: AppColors.successGreen, size: 20),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Monthly Change', style: AppTypography.labelMuted),
-                  Text('+\$2,450.00', style: AppTypography.bodyLg.copyWith(color: AppColors.successGreen, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ],
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: Divider(color: AppColors.surfaceContainerHigh),
-          ),
+
           Row(
             children: [
               Container(
@@ -330,7 +302,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     required Color accentColor,
     required IconData icon,
     bool isNegative = false,
-    String? subtitle,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -379,10 +350,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                       fontSize: 16,
                     ),
                   ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: AppTypography.labelMuted.copyWith(fontSize: 10)),
-                  ],
                 ],
               ),
             ],

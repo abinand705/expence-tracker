@@ -3,7 +3,6 @@ import 'dashboard_screen.dart';
 import 'sms_inbox_screen.dart';
 import 'transactions_screen.dart';
 import 'my_accounts_screen.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_drawer.dart';
 import '../services/app_update_service.dart';
@@ -31,7 +30,7 @@ class _MainLayoutState extends State<MainLayout> {
       if (AppUpdateService().hasPromptedThisSession) return;
 
       final result = await AppUpdateService().checkForUpdate();
-      if (result.status == UpdateCheckStatus.updateAvailable && result.release != null && mounted) {
+      if (result.status == UpdateCheckStatus.updateAvailable && mounted) {
         AppUpdateService().markAsPrompted();
         final packageInfo = await AppUpdateService().getAppVersionInfo();
         if (mounted) {
@@ -39,7 +38,7 @@ class _MainLayoutState extends State<MainLayout> {
             context: context,
             barrierDismissible: false,
             builder: (context) => UpdateDialog(
-              release: result.release!,
+              checkResult: result,
               currentPackageInfo: packageInfo,
             ),
           );
@@ -65,6 +64,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   Widget _buildNavItem(int index, IconData icon) {
     final isSelected = _currentIndex == index;
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
@@ -78,12 +78,12 @@ class _MainLayoutState extends State<MainLayout> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
+                color: isSelected ? cs.primary : Colors.transparent,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 icon,
-                color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
+                color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
                 size: 24,
               ),
             ),
@@ -92,13 +92,13 @@ class _MainLayoutState extends State<MainLayout> {
               Container(
                 width: 6,
                 height: 6,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
+                decoration: BoxDecoration(
+                  color: cs.primary,
                   shape: BoxShape.circle,
                 ),
               ),
             ] else
-              const SizedBox(height: 10), // To keep the height consistent when not selected
+              const SizedBox(height: 10),
           ],
         ),
       ),
@@ -107,6 +107,7 @@ class _MainLayoutState extends State<MainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       drawer: const AppDrawer(),
       body: _screens[_currentIndex],
@@ -119,7 +120,7 @@ class _MainLayoutState extends State<MainLayout> {
             bottom: AppSpacing.md,
           ),
           decoration: BoxDecoration(
-            color: AppColors.surfaceContainerLowest,
+            color: cs.surface,
             borderRadius: BorderRadius.circular(AppRadius.full),
             boxShadow: AppShadows.level2,
           ),

@@ -13,8 +13,10 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    // DrawerHeader brand color is intentional — keep as AppColors.primaryContainer
     return Drawer(
-      backgroundColor: AppColors.surfaceBright,
+      // backgroundColor provided by DrawerThemeData in AppTheme
       child: Column(
         children: [
           Expanded(
@@ -24,19 +26,21 @@ class AppDrawer extends StatelessWidget {
                 DrawerHeader(
                   decoration: const BoxDecoration(color: AppColors.primaryContainer),
                   child: StreamBuilder<Map<String, dynamic>?>(
-                    stream: FirebaseAuth.instance.currentUser != null 
+                    stream: FirebaseAuth.instance.currentUser != null
                         ? UserRepository().watchProfile(FirebaseAuth.instance.currentUser!.uid)
                         : const Stream.empty(),
                     builder: (context, snapshot) {
                       final currentUser = FirebaseAuth.instance.currentUser;
-                      
+
                       String displayName = 'Loading...';
                       String email = '';
-                      
+                      String? photoURL;
+
                       if (snapshot.connectionState == ConnectionState.active || snapshot.connectionState == ConnectionState.done) {
                         final data = snapshot.data;
                         displayName = data?['displayName'] as String? ?? currentUser?.displayName ?? 'User';
                         email = data?['email'] as String? ?? currentUser?.email ?? '';
+                        photoURL = data?['photoURL'] as String? ?? currentUser?.photoURL;
                       }
 
                       return Column(
@@ -46,11 +50,14 @@ class AppDrawer extends StatelessWidget {
                           Container(
                             width: 60,
                             height: 60,
-                            decoration: const BoxDecoration(
+                            decoration: BoxDecoration(
                               color: Colors.white,
                               shape: BoxShape.circle,
+                              image: photoURL != null
+                                  ? DecorationImage(image: NetworkImage(photoURL), fit: BoxFit.cover)
+                                  : null,
                             ),
-                            child: const Icon(Icons.person, size: 36, color: AppColors.primaryContainer),
+                            child: photoURL == null ? const Icon(Icons.person, size: 36, color: AppColors.primaryContainer) : null,
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           Text(displayName, style: AppTypography.headlineMd.copyWith(color: AppColors.onPrimary)),
@@ -62,7 +69,7 @@ class AppDrawer extends StatelessWidget {
                   ),
                 ),
                 ListTile(
-                  leading: const Icon(Icons.settings, color: AppColors.primaryContainer),
+                  leading: Icon(Icons.settings, color: cs.primaryContainer),
                   title: Text('Settings', style: AppTypography.bodyLg),
                   onTap: () {
                     Navigator.pop(context);
@@ -70,7 +77,7 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.help_outline, color: AppColors.onSurfaceVariant),
+                  leading: Icon(Icons.help_outline, color: cs.onSurfaceVariant),
                   title: Text('Help & Support', style: AppTypography.bodyLg),
                   onTap: () {
                     Navigator.pop(context);
@@ -80,7 +87,7 @@ class AppDrawer extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.surfaceContainerHigh),
+          Divider(height: 1, color: cs.outlineVariant),
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
             child: OutlinedButton.icon(
@@ -99,19 +106,20 @@ class AppDrawer extends StatelessWidget {
               icon: const Icon(Icons.logout, color: AppColors.errorRed),
               label: Text('Log Out', style: AppTypography.bodyLg.copyWith(color: AppColors.errorRed, fontWeight: FontWeight.bold)),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.surfaceContainerHigh),
+                side: BorderSide(color: cs.outlineVariant),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 minimumSize: const Size.fromHeight(48),
-                backgroundColor: AppColors.surfaceBright,
+                backgroundColor: Colors.transparent,
               ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.md),
-            child: Text('v1.0.2', style: AppTypography.labelMuted),
+            child: Text('v1.0.2', style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),
           ),
         ],
       ),
     );
   }
 }
+

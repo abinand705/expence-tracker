@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 
@@ -16,11 +15,12 @@ class BalanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.xl),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: AppShadows.level1,
       ),
@@ -32,22 +32,22 @@ class BalanceCard extends StatelessWidget {
             children: [
               Text(
                 'TOTAL BALANCE',
-                style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.labelCaps.copyWith(color: cs.onSurfaceVariant),
               ),
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceContainer,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHigh,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.account_balance_wallet_outlined, size: 20, color: AppColors.primaryContainer),
+                child: Icon(Icons.account_balance_wallet_outlined, size: 20, color: cs.primaryContainer),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             formatter.format(totalBalance),
-            style: AppTypography.displayCurrency,
+            style: AppTypography.displayCurrency.copyWith(color: cs.onSurface),
           ),
         ],
       ),

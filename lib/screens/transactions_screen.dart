@@ -77,7 +77,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -86,7 +85,6 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           },
         ),
         title: Text('Transactions', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
         elevation: 0,
       ),
       drawer: const AppDrawer(),
@@ -102,15 +100,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
               },
               decoration: InputDecoration(
                 hintText: 'Search expenses, merchants...',
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
-                prefixIcon: const Icon(Icons.search, color: AppColors.outline),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                filled: true,
-                fillColor: AppColors.surfaceContainerLowest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
               ),
             ),
           ),
@@ -120,6 +110,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             child: Row(
               children: _filters.map((filter) {
                 final isSelected = _selectedFilter == filter;
+                final cs = Theme.of(context).colorScheme;
                 return Padding(
                   padding: const EdgeInsets.only(right: AppSpacing.sm),
                   child: FilterChip(
@@ -130,17 +121,9 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                         if (selected) _selectedFilter = filter;
                       });
                     },
-                    backgroundColor: AppColors.surfaceContainerLowest,
-                    selectedColor: AppColors.primary,
                     labelStyle: AppTypography.bodyMd.copyWith(
-                      color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
+                      color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(
-                        color: isSelected ? AppColors.primary : AppColors.outlineVariant,
-                      ),
                     ),
                     showCheckmark: false,
                   ),
@@ -149,13 +132,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
             ),
           ),
           Expanded(
-            child: _isLoading 
-              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-              : filteredTransactions.isEmpty 
+            child: _isLoading
+              ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primaryContainer))
+              : filteredTransactions.isEmpty
                   ? const Center(child: Text("No transactions found"))
                   : RefreshIndicator(
                       onRefresh: _loadTransactions,
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primaryContainer,
                       child: ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
                         itemCount: filteredTransactions.length,
