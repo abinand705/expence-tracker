@@ -96,7 +96,7 @@ class _ImportStatementPreviewScreenState extends State<ImportStatementPreviewScr
               children: [
                 Container(
                   padding: const EdgeInsets.all(AppSpacing.md),
-                  color: AppColors.surfaceContainer,
+                  color: Theme.of(context).colorScheme.surface,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -161,8 +161,8 @@ class _ImportStatementPreviewScreenState extends State<ImportStatementPreviewScr
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.onSurfaceVariant)),
-          Text(value, style: const TextStyle(color: AppColors.onSurface)),
+          Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text(value),
         ],
       ),
     );

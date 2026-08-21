@@ -67,7 +67,7 @@ class _BinScreenState extends State<BinScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surfaceBright,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
         title: Text('Permanently Delete?', style: AppTypography.headlineMd),
         content: Text('This conversation will be permanently deleted and cannot be recovered.', style: AppTypography.bodyLg),
@@ -95,9 +95,9 @@ class _BinScreenState extends State<BinScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.onSurface),
         title: Text(
@@ -127,16 +127,16 @@ class _BinScreenState extends State<BinScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.delete_outline, size: 64, color: AppColors.outline),
+                  Icon(Icons.delete_outline, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   const SizedBox(height: AppSpacing.md),
                   Text(
                     'Bin is empty',
-                    style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+                    style: AppTypography.bodyLg.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
                     'Deleted messages will be stored here.',
-                    style: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                    style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -149,7 +149,7 @@ class _BinScreenState extends State<BinScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.sm),
                 child: Text(
                   'Messages in the bin will be permanently deleted after 1 month.',
-                  style: AppTypography.labelMuted.copyWith(color: AppColors.onSurfaceVariant),
+                  style: AppTypography.labelMuted.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -194,13 +194,13 @@ class _BinScreenState extends State<BinScreen> {
                               ),
                         title: Text(
                           conv.senderName,
-                          style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+                          style: AppTypography.bodyLg.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         subtitle: Text(
                           latestMsg?.text ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                          style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,

@@ -128,7 +128,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surfaceBright,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
         title: Text('Block this sender?', style: AppTypography.headlineMd),
         content: Text("You won't see new messages from them.", style: AppTypography.bodyLg),
@@ -158,7 +158,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
     final currentConv = _getCurrentConv();
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -170,7 +170,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               const SizedBox(height: AppSpacing.sm),
               ListTile(
                 leading: const Icon(Icons.search, color: AppColors.primaryContainer),
-                title: Text('Search', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface)),
+                title: Text('Search', style: AppTypography.bodyLg),
                 onTap: () {
                   Navigator.pop(context);
                   setState(() {
@@ -186,7 +186,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                 ),
                 title: Text(
                   currentConv.isMuted ? 'Unmute Notifications' : 'Mute Notifications',
-                  style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface),
+                  style: AppTypography.bodyLg,
                 ),
                 onTap: () {
                   Navigator.pop(context);
@@ -195,7 +195,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: AppColors.primaryContainer),
-                title: Text('Clear Chat', style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface)),
+                title: Text('Clear Chat', style: AppTypography.bodyLg),
                 onTap: () {
                   Navigator.pop(context);
                   _smsService.deleteConversation(currentConv.id);
@@ -210,9 +210,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                   _confirmBlock(context);
                 },
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                child: Divider(color: AppColors.outlineVariant, height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+                child: Divider(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 24),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -229,13 +229,13 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: _isSearching
           ? AppBar(
-              backgroundColor: AppColors.surfaceContainerLowest,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               elevation: 1,
               leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
+                icon: const Icon(Icons.arrow_back),
                 onPressed: () {
                   setState(() {
                     _isSearching = false;
@@ -251,7 +251,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search...',
                   border: InputBorder.none,
-                  hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                  hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 style: AppTypography.bodyLg,
               ),
@@ -260,11 +260,11 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                   Center(
                     child: Text(
                       '${_currentMatchIndex + 1} of ${_matchIndices.length}',
-                      style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+                      style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_up, color: AppColors.onSurface),
+                    icon: const Icon(Icons.keyboard_arrow_up),
                     onPressed: () {
                       if (_currentMatchIndex > 0) {
                         setState(() {
@@ -274,7 +274,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.onSurface),
+                    icon: const Icon(Icons.keyboard_arrow_down),
                     onPressed: () {
                       if (_currentMatchIndex < _matchIndices.length - 1) {
                         setState(() {
@@ -287,7 +287,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               ],
             )
           : AppBar(
-              backgroundColor: AppColors.surfaceContainerLowest,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               elevation: 1,
               iconTheme: const IconThemeData(color: AppColors.onSurface),
               titleSpacing: 0,
@@ -316,7 +316,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.more_vert, color: AppColors.onSurface),
+                  icon: const Icon(Icons.more_vert),
                   onPressed: () => _showOptionsModal(context),
                 ),
               ],
@@ -359,7 +359,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                             padding: const EdgeInsets.only(right: AppSpacing.xs),
                             child: ActionChip(
                               label: Text(text, style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
-                              backgroundColor: AppColors.surfaceContainerHigh,
+                              backgroundColor: Theme.of(context).colorScheme.surface,
                               side: BorderSide.none,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               onPressed: () {
@@ -381,7 +381,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                             padding: const EdgeInsets.only(right: AppSpacing.xs),
                             child: ActionChip(
                               label: Text(text, style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
-                              backgroundColor: AppColors.surfaceContainerHigh,
+                              backgroundColor: Theme.of(context).colorScheme.surface,
                               side: BorderSide.none,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               onPressed: () {
@@ -396,7 +396,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                     ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
-                    color: AppColors.surfaceContainerLowest,
+                    color: Theme.of(context).colorScheme.surface,
                     child: SafeArea(
                       child: Row(
                         children: [
@@ -407,9 +407,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                               maxLines: 4,
                               decoration: InputDecoration(
                                 hintText: 'Type an SMS message...',
-                                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                                hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 filled: true,
-                                fillColor: AppColors.surfaceContainer,
+                                fillColor: Theme.of(context).colorScheme.surface,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: BorderSide.none,
@@ -420,7 +420,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           CircleAvatar(
-                            backgroundColor: _canSend ? AppColors.smsPrimary : AppColors.surfaceContainerHigh,
+                            backgroundColor: _canSend ? AppColors.smsPrimary : Theme.of(context).colorScheme.surface,
                             child: IconButton(
                               icon: const Icon(Icons.send, color: Colors.white, size: 20),
                               onPressed: _canSend ? _sendMessage : null,
@@ -456,7 +456,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
     final isHighlighted = _isSearching && _matchIndices.isNotEmpty && _currentMatchIndex != -1 && _matchIndices[_currentMatchIndex] == index;
     final bubbleColor = isHighlighted 
         ? AppColors.primaryContainer 
-        : (msg.isMe ? AppColors.smsPrimary : AppColors.surfaceContainerHighest);
+        : (msg.isMe ? AppColors.smsPrimary : Theme.of(context).colorScheme.surface);
     final textColor = isHighlighted
         ? Colors.white
         : (msg.isMe ? Colors.white : AppColors.onSurface);
@@ -470,7 +470,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Text(_formatDateHeader(msg.timestamp), style: AppTypography.labelMuted),
@@ -489,9 +489,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (!msg.isMe && isBankSender)
-                  const Padding(
-                    padding: EdgeInsets.only(right: 4, bottom: 4),
-                    child: Icon(Icons.currency_rupee, size: 14, color: AppColors.outline),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4, bottom: 4),
+                    child: Icon(Icons.currency_rupee, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 Flexible(
                   child: Container(

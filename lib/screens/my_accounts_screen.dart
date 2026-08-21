@@ -89,14 +89,14 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
           title: Text('My Accounts', style: AppTypography.headlineMd),
-          backgroundColor: AppColors.background,
+          
           elevation: 0,
         ),
         body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
@@ -107,7 +107,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -116,7 +116,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
           },
         ),
         title: Text('My Accounts', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
       ),
       body: RefreshIndicator(
@@ -129,7 +129,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             children: [
               _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
               const SizedBox(height: AppSpacing.md),
-              _buildStatsCard(),
+              _buildStatsCard(context),
               const SizedBox(height: AppSpacing.xl),
               Text(
                 'Linked Accounts',
@@ -148,7 +148,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                     child: InkWell(
                       onTap: () => _showAccountOptionsModal(context, acc),
                       borderRadius: BorderRadius.circular(12),
-                      child: _buildLinkedAccountCard(
+                      child: _buildLinkedAccountCard(context: context,
                         bankName: acc.bankName,
                         accountType: acc.accountType,
                         accountNumber: acc.maskedAccountNumber,
@@ -174,7 +174,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: AppShadows.level1,
       ),
@@ -183,7 +183,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         children: [
           Text(
             'TOTAL NET WORTH',
-            style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant),
+            style: AppTypography.labelCaps.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
@@ -215,11 +215,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _showAddAccountModal(context),
-                  icon: const Icon(Icons.add, color: AppColors.onSurfaceVariant, size: 16),
-                  label: Text('Add Manual Account', style: AppTypography.labelCaps.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                  icon: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
+                  label: Text('Add Manual Account', style: AppTypography.labelCaps.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: const BorderSide(color: AppColors.surfaceContainerHigh),
+                    side: BorderSide(color: Theme.of(context).colorScheme.surface),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
@@ -231,12 +231,12 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  Widget _buildStatsCard() {
+  Widget _buildStatsCard(context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -260,7 +260,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
           if (_pendingDues.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              child: Text('No pending dues', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+              child: Text('No pending dues', style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             )
           else
             ..._pendingDues.where((d) => d.dueDate.isAfter(DateTime.now().subtract(const Duration(days: 1)))).map((due) {
@@ -279,7 +279,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(formatter.format(due.amount), style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
+                        Text(formatter.format(due.amount), style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold)),
                         Text(maskedAcc, style: AppTypography.labelMuted),
                         Text(due.description ?? 'Scheduled debit', style: AppTypography.labelMuted.copyWith(fontSize: 10)),
                       ],
@@ -294,7 +294,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  Widget _buildLinkedAccountCard({
+  Widget _buildLinkedAccountCard({required BuildContext context,
     required String bankName,
     required String accountType,
     required String accountNumber,
@@ -305,7 +305,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: AppShadows.level1,
       ),
@@ -346,7 +346,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                   Text(
                     balance,
                     style: AppTypography.headlineMd.copyWith(
-                      color: isNegative ? AppColors.errorRed : AppColors.onSurface,
+                      color: isNegative ? AppColors.errorRed : Theme.of(context).colorScheme.onSurface,
                       fontSize: 16,
                     ),
                   ),
@@ -363,7 +363,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     return GestureDetector(
       onTap: () => _showAddAccountModal(context),
       child: CustomPaint(
-        painter: DashedRectPainter(color: AppColors.outlineVariant, strokeWidth: 1, gap: 5),
+        painter: DashedRectPainter(color: Theme.of(context).colorScheme.onSurfaceVariant, strokeWidth: 1, gap: 5),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
@@ -372,11 +372,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceContainerHigh,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.link, color: AppColors.onSurfaceVariant),
+                child: Icon(Icons.link, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text('Link another bank', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600, color: AppColors.primaryContainer)),
@@ -392,7 +392,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   void _showAccountOptionsModal(BuildContext context, Account account) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) {
         return SafeArea(
@@ -401,7 +401,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.outlineVariant, borderRadius: BorderRadius.circular(2))),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurfaceVariant, borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: AppSpacing.lg),
                 Text(account.name, style: AppTypography.headlineMd),
                 const SizedBox(height: AppSpacing.lg),
@@ -452,7 +452,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) {
         return StatefulBuilder(

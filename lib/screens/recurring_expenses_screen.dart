@@ -24,10 +24,10 @@ class _RecurringExpensesScreenState extends State<RecurringExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         title: Text('Recurring Expenses', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         actions: [
           IconButton(
@@ -66,7 +66,7 @@ class _RecurringExpensesScreenState extends State<RecurringExpensesScreen> {
 
               return Card(
                 margin: const EdgeInsets.only(bottom: AppSpacing.md),
-                color: AppColors.surfaceBright,
+                color: Theme.of(context).colorScheme.surface,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
                 child: ListTile(
                   contentPadding: const EdgeInsets.all(AppSpacing.md),
@@ -222,8 +222,8 @@ class _RecurringExpenseFormState extends State<_RecurringExpenseForm> {
         right: AppSpacing.md,
         top: AppSpacing.md,
       ),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: _isLoadingDeps 

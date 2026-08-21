@@ -81,7 +81,12 @@ class AppUpdateService {
       var status = UpdateCheckStatus.unknownError;
       final stringError = e.toString().toLowerCase();
 
-      if (stringError.contains('network') || stringError.contains('socket') || stringError.contains('connect') || stringError.contains('timeout')) {
+      if (stringError.contains('network') || 
+          stringError.contains('socket') || 
+          stringError.contains('connect') || 
+          stringError.contains('timeout') ||
+          stringError.contains('host lookup') ||
+          stringError.contains('clientexception')) {
         status = UpdateCheckStatus.networkError;
       } else if (stringError.contains('format') || stringError.contains('json')) {
         status = UpdateCheckStatus.configurationError;

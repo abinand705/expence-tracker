@@ -77,11 +77,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     final userEmail = user?.email ?? 'user@example.com';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         title: Text('Help & Support', style: AppTypography.headlineMd),
         centerTitle: true,
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -93,22 +93,22 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             TextField(
               decoration: InputDecoration(
                 hintText: 'Search help articles...',
-                hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
-                prefixIcon: const Icon(Icons.search, color: AppColors.outline),
+                hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.surface),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.surface),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary),
+                  borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),
@@ -129,9 +129,9 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.surfaceContainerHigh),
+                border: Border.all(color: Theme.of(context).colorScheme.surface),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,10 +184,10 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
             Center(
               child: OutlinedButton.icon(
                 onPressed: () {},
-                icon: const Icon(Icons.code, size: 18, color: AppColors.onSurfaceVariant),
-                label: Text('View on GitHub', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+                icon: Icon(Icons.code, size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                label: Text('View on GitHub', style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppColors.surfaceContainerHigh),
+                  side: BorderSide(color: Theme.of(context).colorScheme.surface),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
                 ),
@@ -204,22 +204,22 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.surfaceContainerHigh),
+        border: Border.all(color: Theme.of(context).colorScheme.surface),
       ),
       child: Theme(
-        data: ThemeData(dividerColor: Colors.transparent),
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           title: Text(title, style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600)),
-          iconColor: AppColors.onSurfaceVariant,
-          collapsedIconColor: AppColors.onSurfaceVariant,
+          iconColor: Theme.of(context).colorScheme.onSurfaceVariant,
+          collapsedIconColor: Theme.of(context).colorScheme.onSurfaceVariant,
           children: [
             Padding(
               padding: const EdgeInsets.only(left: 16.0, right: 16.0, bottom: 16.0),
               child: Text(
                 'This is a placeholder answer for the frequently asked question.',
-                style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
+                style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ),
           ],
@@ -231,7 +231,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   Widget _buildTextFieldLabel(String label) {
     return Text(
       label,
-      style: AppTypography.labelCaps.copyWith(color: AppColors.primaryContainer, fontWeight: FontWeight.bold),
+      style: AppTypography.labelCaps.copyWith(color: Theme.of(context).colorScheme.primaryContainer, fontWeight: FontWeight.bold),
     );
   }
   
@@ -242,21 +242,21 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       readOnly: readOnly,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+        hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
         filled: true,
-        fillColor: AppColors.surfaceBright,
+        fillColor: Theme.of(context).colorScheme.surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.surface),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.surfaceContainerHigh),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.surface),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderSide: BorderSide(color: Theme.of(context).colorScheme.primary),
         ),
       ),
     );

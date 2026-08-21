@@ -3,9 +3,6 @@ import 'app_colors.dart';
 import 'app_typography.dart';
 
 class AppTheme {
-  // ─────────────────────────────────────────────────────────────────────────
-  // Light Theme
-  // ─────────────────────────────────────────────────────────────────────────
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
@@ -55,7 +52,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceContainerLowest,
-        hintStyle: TextStyle(color: AppColors.outline),
+        hintStyle: const TextStyle(color: AppColors.outline),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.outlineVariant),
@@ -105,9 +102,6 @@ class AppTheme {
     );
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // Dark Theme
-  // ─────────────────────────────────────────────────────────────────────────
   static ThemeData get darkTheme {
     return ThemeData(
       useMaterial3: true,
@@ -157,7 +151,7 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColorsDark.surfaceContainerLow,
-        hintStyle: TextStyle(color: AppColorsDark.outline),
+        hintStyle: const TextStyle(color: AppColorsDark.outline),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColorsDark.outlineVariant),
@@ -207,4 +201,3 @@ class AppTheme {
     );
   }
 }
-

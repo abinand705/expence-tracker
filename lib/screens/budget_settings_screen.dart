@@ -69,7 +69,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) {
         return StatefulBuilder(
@@ -178,7 +178,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.surfaceBright,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: const Text('Delete Budget'),
         content: Text('Are you sure you want to delete the ${budget.category} budget?'),
         actions: [
@@ -206,10 +206,10 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
     final formatter = NumberFormat.currency(locale: 'en_IN', symbol: '₹', decimalDigits: 0);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         title: Text('Budgets', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         actions: [
           IconButton(
@@ -232,7 +232,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLowest,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(AppRadius.lg),
                         boxShadow: AppShadows.level1,
                       ),
@@ -246,7 +246,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit, color: AppColors.outline),
+                              icon: Icon(Icons.edit, color: Theme.of(context).colorScheme.onSurfaceVariant),
                               onPressed: () => _showBudgetModal(existingBudget: budget),
                             ),
                             IconButton(

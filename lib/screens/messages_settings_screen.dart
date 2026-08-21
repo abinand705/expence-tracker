@@ -16,9 +16,9 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.onSurface),
         title: Text('Message Settings', style: AppTypography.headlineMd),
@@ -42,20 +42,20 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Theme', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                          Text('Theme', style: AppTypography.bodyMd),
                           const SizedBox(height: AppSpacing.xs),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                             decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.outlineVariant),
+                              border: Border.all(color: Theme.of(context).colorScheme.onSurfaceVariant),
                               borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<ThemeMode>(
                                 value: settings.themeMode,
                                 isExpanded: true,
-                                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.onSurfaceVariant),
+                                icon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 items: const [
                                   DropdownMenuItem(value: ThemeMode.system, child: Text('System Default')),
                                   DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
@@ -95,20 +95,20 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Auto-delete old messages', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                          Text('Auto-delete old messages', style: AppTypography.bodyMd),
                           const SizedBox(height: AppSpacing.xs),
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                             decoration: BoxDecoration(
-                              border: Border.all(color: AppColors.outlineVariant),
+                              border: Border.all(color: Theme.of(context).colorScheme.onSurfaceVariant),
                               borderRadius: BorderRadius.circular(AppRadius.md),
                             ),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<int?>(
                                 value: settings.autoDeleteDays,
                                 isExpanded: true,
-                                icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.onSurfaceVariant),
+                                icon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                 items: const [
                                   DropdownMenuItem(value: null, child: Text('Never')),
                                   DropdownMenuItem(value: 7, child: Text('After 7 Days')),
@@ -140,7 +140,7 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
         boxShadow: AppShadows.level1,
       ),
@@ -153,8 +153,8 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: const BoxDecoration(
-                    color: AppColors.surfaceBright,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(icon, color: AppColors.primaryContainer, size: 20),
@@ -173,14 +173,14 @@ class _MessagesSettingsScreenState extends State<MessagesSettingsScreen> {
 
   Widget _buildSwitchTile({required String title, String? subtitle, required bool value, required ValueChanged<bool> onChanged}) {
     return SwitchListTile(
-      title: Text(title, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+      title: Text(title, style: AppTypography.bodyMd),
       subtitle: subtitle != null ? Text(subtitle, style: AppTypography.labelMuted) : null,
       value: value,
       onChanged: onChanged,
       activeThumbColor: Colors.white,
       activeTrackColor: AppColors.primary,
-      inactiveThumbColor: AppColors.outlineVariant,
-      inactiveTrackColor: AppColors.surfaceContainer,
+      inactiveThumbColor: Theme.of(context).colorScheme.onSurfaceVariant,
+      inactiveTrackColor: Theme.of(context).colorScheme.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
     );
   }

@@ -73,10 +73,10 @@ class _ComposeSmsScreenState extends State<ComposeSmsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         title: Text('Compose Message', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         actions: [
           IconButton(

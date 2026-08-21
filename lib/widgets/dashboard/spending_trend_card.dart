@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import 'package:intl/intl.dart' hide TextDirection;
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
 import '../../models/transaction.dart';

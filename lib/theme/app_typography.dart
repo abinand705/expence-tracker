@@ -1,61 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'app_colors.dart';
 
 class AppTypography {
   // ── Standalone style getters ─────────────────────────────────────────────
-  // These are used for specific widgets with explicit color overrides.
-  // They keep their colors intentionally.
+  // NO explicit color set here — color is inherited from the active theme
+  // (colorScheme.onSurface for light/dark) automatically.
+  // To tint a specific text, use .copyWith(color: ...) at the call site.
 
   static TextStyle get displayCurrency => GoogleFonts.inter(
     fontSize: 32,
     fontWeight: FontWeight.w700,
     height: 40 / 32,
     letterSpacing: -0.02,
-    color: AppColors.onSurface,
   );
 
   static TextStyle get headlineLg => GoogleFonts.inter(
     fontSize: 24,
     fontWeight: FontWeight.w600,
     height: 32 / 24,
-    color: AppColors.onSurface,
   );
 
   static TextStyle get headlineMd => GoogleFonts.inter(
     fontSize: 20,
     fontWeight: FontWeight.w600,
     height: 28 / 20,
-    color: AppColors.onSurface,
   );
 
   static TextStyle get bodyLg => GoogleFonts.inter(
     fontSize: 16,
     fontWeight: FontWeight.w400,
     height: 24 / 16,
-    color: AppColors.onSurface,
   );
 
   static TextStyle get bodyMd => GoogleFonts.inter(
     fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 20 / 14,
-    color: AppColors.onSurface,
   );
 
+  // labelCaps and labelMuted intentionally have no color so they inherit.
+  // Use .copyWith(color: cs.onSurfaceVariant) or .copyWith(color: cs.outline)
+  // at the call site if you need a muted/variant colour.
   static TextStyle get labelCaps => GoogleFonts.inter(
     fontSize: 12,
     fontWeight: FontWeight.w600,
     height: 16 / 12,
     letterSpacing: 0.05,
-    color: AppColors.onSurfaceVariant,
   );
 
   static TextStyle get labelMuted => GoogleFonts.inter(
     fontSize: 12,
     fontWeight: FontWeight.w400,
     height: 16 / 12,
-    color: AppColors.outline,
   );
 
   // ── TextTheme for MaterialApp ─────────────────────────────────────────────
@@ -103,4 +99,3 @@ class AppTypography {
     );
   }
 }
-

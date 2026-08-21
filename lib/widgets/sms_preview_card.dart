@@ -16,6 +16,7 @@ class SmsPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currencyFormatter = NumberFormat.simpleCurrency();
+    final cs = Theme.of(context).colorScheme;
     
     return GestureDetector(
       onTap: () {
@@ -26,7 +27,7 @@ class SmsPreviewCard extends StatelessWidget {
             id: 'temp', 
             senderName: message.sender, 
             senderNumber: message.sender,
-            avatarColor: AppColors.primaryContainer,
+            avatarColor: cs.primaryContainer,
             messages: [
               Message(
                 id: message.id, 
@@ -50,7 +51,7 @@ class SmsPreviewCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
           boxShadow: AppShadows.level1,
         ),
@@ -58,11 +59,11 @@ class SmsPreviewCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             CircleAvatar(
-              backgroundColor: AppColors.surfaceContainerHigh,
+              backgroundColor: cs.surfaceContainerHigh,
               child: Text(
                 message.sender.substring(0, 1).toUpperCase(),
                 style: AppTypography.bodyLg.copyWith(
-                  color: AppColors.onSurfaceVariant,
+                  color: cs.onSurfaceVariant,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -83,7 +84,7 @@ class SmsPreviewCard extends StatelessWidget {
                       ),
                       Text(
                         DateFormat.jm().format(message.date),
-                        style: AppTypography.labelMuted,
+                        style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -91,7 +92,7 @@ class SmsPreviewCard extends StatelessWidget {
                   Text(
                     message.snippet,
                     style: AppTypography.bodyMd.copyWith(
-                      color: AppColors.onSurfaceVariant,
+                      color: cs.onSurfaceVariant,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,

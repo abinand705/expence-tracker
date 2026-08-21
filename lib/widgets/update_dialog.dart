@@ -34,8 +34,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
     final buildVersion = publicRelease?.buildNumber.toString() ?? betaRelease?.buildVersion ?? '';
     final releaseNotes = publicRelease?.releaseNotes ?? betaRelease?.releaseNotes;
 
+    final cs = Theme.of(context).colorScheme;
+
     return AlertDialog(
-      backgroundColor: AppColors.surfaceContainerLowest,
+      // backgroundColor provided by DialogTheme in AppTheme
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
       title: Text('New version available', style: AppTypography.headlineMd),
       content: SingleChildScrollView(
@@ -47,7 +49,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             const SizedBox(height: AppSpacing.sm),
             Text('Current version:\n${widget.currentPackageInfo.version}+${widget.currentPackageInfo.buildNumber}', style: AppTypography.bodyMd),
             const SizedBox(height: AppSpacing.sm),
-            Text('New version:\n$displayVersion+$buildVersion', style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
+            Text('New version:\n$displayVersion+$buildVersion', style: AppTypography.bodyMd.copyWith(color: cs.primaryContainer)),
             if (releaseNotes != null && releaseNotes.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.md),
               Text('What\'s new:', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
@@ -64,8 +66,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
               const SizedBox(height: AppSpacing.xs),
               LinearProgressIndicator(
                 value: _progress > 0 ? _progress : null,
-                backgroundColor: AppColors.surfaceContainerHigh,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                backgroundColor: cs.surfaceContainerHigh,
+                valueColor: AlwaysStoppedAnimation<Color>(cs.primaryContainer),
               ),
               if (_progress > 0)
                 Align(
@@ -76,22 +78,22 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   ),
                 ),
               const SizedBox(height: AppSpacing.sm),
-              Text('To install this update, Android may ask you to allow MoneyTrack to install unknown apps.', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
+              Text('To install this update, Android may ask you to allow MoneyTrack to install unknown apps.', style: AppTypography.bodyMd.copyWith(color: cs.outline)),
             ],
           ],
         ),
       ),
       actions: _isDownloading
-          ? [] 
+          ? []
           : [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
-                child: Text('Later', style: AppTypography.labelCaps.copyWith(color: AppColors.outline)),
+                child: Text('Later', style: AppTypography.labelCaps.copyWith(color: cs.outline)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.onPrimary,
+                  backgroundColor: cs.primaryContainer,
+                  foregroundColor: cs.onPrimary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.md)),
                 ),
                 onPressed: _startDownload,

@@ -98,7 +98,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
   void _showConversationOptions(BuildContext context, Conversation conv) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surfaceBright,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) => SafeArea(
         child: Column(
@@ -136,7 +136,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
           builder: (context, _) {
             final blocked = _smsService.blockedNumbers.toList();
             return AlertDialog(
-              backgroundColor: AppColors.surfaceBright,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               title: Text('Blocked Contacts', style: AppTypography.headlineMd),
               content: SizedBox(
                 width: double.maxFinite,
@@ -215,7 +215,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.sms_failed_outlined, size: 64, color: AppColors.outline),
+            Icon(Icons.sms_failed_outlined, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(height: AppSpacing.lg),
             Text(
               'SMS Access Required',
@@ -227,7 +227,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                 ? 'SMS permission has been permanently denied. Please open Android settings to grant MoneyTrack access to read SMS.'
                 : 'MoneyTrack reads bank transaction SMS messages to automatically\nidentify your income and expenses.\n\nYour SMS messages are processed for transaction detection.',
               textAlign: TextAlign.center,
-              style: AppTypography.bodyLg.copyWith(color: AppColors.onSurfaceVariant),
+              style: AppTypography.bodyLg.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: AppSpacing.xl),
             ElevatedButton(
@@ -252,7 +252,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -261,7 +261,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
           },
         ),
         title: Text('Messages', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         actions: [
           if (_isSyncing)
@@ -282,8 +282,8 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
               tooltip: 'Sync Transactions',
             ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert, color: AppColors.onSurface),
-            color: AppColors.surfaceBright,
+            icon: const Icon(Icons.more_vert),
+            color: Theme.of(context).colorScheme.surface,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.lg)),
             onSelected: (value) {
               if (value == 'new') {
@@ -303,9 +303,9 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                 value: 'new',
                 child: Row(
                   children: [
-                    const Icon(Icons.edit_outlined, color: AppColors.onSurfaceVariant, size: 20),
+                    Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSpacing.sm),
-                    Text('New message', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                    Text('New message', style: AppTypography.bodyMd),
                   ],
                 ),
               ),
@@ -313,9 +313,9 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                 value: 'read',
                 child: Row(
                   children: [
-                    const Icon(Icons.checklist, color: AppColors.onSurfaceVariant, size: 20),
+                    Icon(Icons.checklist, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSpacing.sm),
-                    Text('Mark all as read', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                    Text('Mark all as read', style: AppTypography.bodyMd),
                   ],
                 ),
               ),
@@ -323,9 +323,9 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                 value: 'settings',
                 child: Row(
                   children: [
-                    const Icon(Icons.settings_outlined, color: AppColors.onSurfaceVariant, size: 20),
+                    Icon(Icons.settings_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSpacing.sm),
-                    Text('Message settings', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                    Text('Message settings', style: AppTypography.bodyMd),
                   ],
                 ),
               ),
@@ -333,9 +333,9 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                 value: 'blocked',
                 child: Row(
                   children: [
-                    const Icon(Icons.block, color: AppColors.onSurfaceVariant, size: 20),
+                    Icon(Icons.block, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
                     const SizedBox(width: AppSpacing.sm),
-                    Text('Blocked contacts', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface)),
+                    Text('Blocked contacts', style: AppTypography.bodyMd),
                   ],
                 ),
               ),
@@ -369,10 +369,10 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                   onChanged: (value) => _smsService.setSearchQuery(value),
                   decoration: InputDecoration(
                     hintText: 'Search messages, contacts...',
-                    hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
-                    prefixIcon: const Icon(Icons.search, color: AppColors.outline),
+                    hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     filled: true,
-                    fillColor: AppColors.surfaceContainerLowest,
+                    fillColor: Theme.of(context).colorScheme.surface,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadius.full),
                       borderSide: BorderSide.none,
@@ -450,11 +450,10 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                                     conv.senderName,
                                     style: AppTypography.bodyLg.copyWith(
                                       fontWeight: hasUnread ? FontWeight.bold : FontWeight.w500,
-                                      color: AppColors.onSurface,
-                                    ),
+                                      ),
                                   ),
                                 ),
-                                if (conv.isPinned) const Icon(Icons.push_pin, size: 16, color: AppColors.outline),
+                                if (conv.isPinned) Icon(Icons.push_pin, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
                               ],
                             ),
                             subtitle: Row(
@@ -488,7 +487,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     if (conv.isMuted) ...[
-                                      const Icon(Icons.notifications_off, size: 14, color: AppColors.outline),
+                                      Icon(Icons.notifications_off, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                                       const SizedBox(width: 4),
                                     ],
                                     Text(
@@ -552,7 +551,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
         selected: isSelected,
         onSelected: (_) => _smsService.setFilter(filter),
         selectedColor: AppColors.primary,
-        backgroundColor: AppColors.surfaceContainerLowest,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         showCheckmark: false,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.full),

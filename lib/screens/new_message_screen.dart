@@ -56,10 +56,10 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      
       appBar: AppBar(
         title: Text('New Conversation', style: AppTypography.headlineMd),
-        backgroundColor: AppColors.background,
+        
         elevation: 0,
         iconTheme: const IconThemeData(color: AppColors.onSurface),
       ),
@@ -67,10 +67,10 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin, vertical: AppSpacing.md),
-            color: AppColors.surfaceContainerLowest,
+            color: Theme.of(context).colorScheme.surface,
             child: Row(
               children: [
-                Text('To:', style: AppTypography.bodyLg.copyWith(color: AppColors.outline)),
+                Text('To:', style: AppTypography.bodyLg.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: TextField(
@@ -78,7 +78,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                     autofocus: true,
                     decoration: InputDecoration(
                       hintText: 'Type a name or phone number...',
-                      hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outlineVariant),
+                      hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -93,7 +93,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
           // Input Area
           Container(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
-            color: AppColors.surfaceContainerLowest,
+            color: Theme.of(context).colorScheme.surface,
             child: SafeArea(
               child: Row(
                 children: [
@@ -104,9 +104,9 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                       maxLines: 4,
                       decoration: InputDecoration(
                         hintText: 'Type an SMS message...',
-                        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+                        hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                         filled: true,
-                        fillColor: AppColors.surfaceContainer,
+                        fillColor: Theme.of(context).colorScheme.surface,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(20),
                           borderSide: BorderSide.none,
@@ -117,7 +117,7 @@ class _NewMessageScreenState extends State<NewMessageScreen> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   CircleAvatar(
-                    backgroundColor: _canSend ? AppColors.smsPrimary : AppColors.surfaceContainerHigh,
+                    backgroundColor: _canSend ? AppColors.smsPrimary : Theme.of(context).colorScheme.surface,
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white, size: 20),
                       onPressed: _canSend ? _sendMessage : null,

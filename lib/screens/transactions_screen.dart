@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../repositories/transaction_repository.dart';
 import '../models/transaction.dart';
-import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../widgets/transaction_card.dart';

@@ -213,9 +213,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        // backgroundColor inherited from theme
         appBar: AppBar(
           leading: Builder(
             builder: (context) => IconButton(
@@ -224,11 +226,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           title: const SizedBox.shrink(),
-          backgroundColor: AppColors.background,
           elevation: 0,
         ),
         drawer: const AppDrawer(),
-        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: Center(child: CircularProgressIndicator(color: cs.primary)),
       );
     }
 
@@ -247,20 +248,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final isWithinTarget = monthlyTarget == 0.0 ? true : _currentMonthSpend <= monthlyTarget;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
           onPressed: () => Scaffold.of(context).openDrawer(),
         ),
         title: const SizedBox.shrink(),
-        backgroundColor: AppColors.background,
         elevation: 0,
       ),
       drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: _loadData,
-        color: AppColors.primary,
+        color: cs.primary,
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
@@ -272,7 +271,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Text(
                       greeting,
                       style: AppTypography.headlineMd.copyWith(
-                        color: AppColors.onSurface,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -281,10 +279,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: AppSpacing.md),
                     Card(
                       elevation: 0,
-                      color: AppColors.surfaceContainerLowest,
+                      color: cs.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: AppColors.outlineVariant),
+                        side: BorderSide(color: cs.onSurfaceVariant),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.md),
@@ -293,7 +291,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           children: [
                             Text(
                               'This Month',
-                              style: AppTypography.labelCaps.copyWith(color: AppColors.outline),
+                              style: AppTypography.labelCaps.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Row(
@@ -301,7 +299,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               children: [
                                 Text(
                                   'Credited',
-                                  style: AppTypography.bodyLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.w600),
+                                  style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w600),
                                 ),
                                 Text(
                                   currencyFormatter.format(_currentMonthCredited),
@@ -350,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         Text(
                           'Recent Transactions',
                           style: AppTypography.headlineMd.copyWith(
-                            color: AppColors.primaryContainer,
+                            color: cs.primaryContainer,
                           ),
                         ),
                         GestureDetector(
@@ -358,7 +356,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Text(
                             'SEE ALL',
                             style: AppTypography.labelCaps.copyWith(
-                              color: AppColors.primaryContainer,
+                              color: cs.primaryContainer,
                               fontWeight: FontWeight.w700,
                             ),
                           ),

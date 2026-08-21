@@ -18,7 +18,6 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text('Settings', style: AppTypography.headlineMd),
