@@ -6,12 +6,14 @@ import '../theme/theme_controller.dart';
 import '../services/auth_service.dart';
 import 'budget_settings_screen.dart';
 import 'recurring_expenses_screen.dart';
+import 'export_data_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../services/app_update_service.dart';
 import '../widgets/update_dialog.dart';
 import 'help_support_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../repositories/user_repository.dart';
+import '../widgets/settings/notification_setting_tile.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -28,7 +30,7 @@ class SettingsScreen extends StatelessWidget {
         children: [
           _buildSectionHeader(context, 'PREFERENCES'),
           const _AppearanceSetting(),
-          _buildSettingsTile(context, Icons.notifications, 'Notifications', trailing: Switch(value: true, onChanged: (v) {})),
+          const NotificationSettingTile(),
           _buildSettingsTile(context, Icons.security, 'Biometric Lock', trailing: Switch(value: false, onChanged: (v) {})),
           const _ExpenseCycleSetting(),
           _buildSettingsTile(
@@ -50,7 +52,14 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: AppSpacing.lg),
           _buildSectionHeader(context, 'DATA'),
           _buildSettingsTile(context, Icons.backup, 'Backup & Restore'),
-          _buildSettingsTile(context, Icons.download, 'Export Data'),
+          _buildSettingsTile(
+            context,
+            Icons.download, 
+            'Export Data',
+            onTap: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ExportDataScreen()));
+            },
+          ),
           const SizedBox(height: AppSpacing.lg),
           _buildSectionHeader(context, 'ABOUT'),
           const _AppVersionCard(),
@@ -488,3 +497,5 @@ class _ExpenseCycleSettingState extends State<_ExpenseCycleSetting> {
     );
   }
 }
+
+

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../repositories/user_repository.dart';
+import '../repositories/budget_repository.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
@@ -30,6 +31,9 @@ class AuthService {
           displayName: displayName,
           email: email,
         );
+        try {
+          await BudgetRepository().ensureDefaultBudget();
+        } catch (_) {}
       } catch (e) {
         // Rollback user creation if profile creation fails
         await cred.user?.delete();
@@ -102,6 +106,9 @@ class AuthService {
              displayName: userCredential.user!.displayName ?? 'Google User',
              email: userCredential.user!.email ?? '',
            );
+           try {
+             await BudgetRepository().ensureDefaultBudget();
+           } catch (_) {}
         }
       }
 

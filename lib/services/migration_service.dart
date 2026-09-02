@@ -5,6 +5,7 @@ import '../repositories/transaction_repository.dart';
 import '../repositories/pending_due_repository.dart';
 import '../repositories/account_repository.dart';
 import '../models/account.dart';
+import 'transaction_identity_service.dart';
 
 class MigrationService {
   final TransactionRepository transactionRepo;
@@ -87,8 +88,52 @@ class MigrationService {
 
       debugPrint('[MigrationService] Migration complete: $txMigrated transactions, $duesMigrated pending dues migrated.');
       await userMetaRef.set({'accountMigrationVersion': 1}, SetOptions(merge: true));
+
+      await runDuplicateCleanupMigration();
     } catch (e) {
       debugPrint('[MigrationService] Migration failed: $e');
+    }
+  }
+
+  Future<void> runDuplicateCleanupMigration() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final userDocRef = _firestore.collection('users').doc(uid);
+    final userMetaRef = userDocRef.collection('metadata').doc('migration_status');
+
+    try {
+      final docSnapshot = await userMetaRef.get();
+      if (docSnapshot.exists) {
+        final version = docSnapshot.data()?['duplicateCleanupVersion'] ?? 0;
+        if (version >= 1) {
+          debugPrint('[MigrationService] Duplicate cleanup already run. Skipping.');
+          return;
+        }
+      }
+
+      debugPrint('[MigrationService] Starting conservative duplicate transaction cleanup...');
+      final allTransactions = await transactionRepo.getTransactions();
+      if (allTransactions.isEmpty) {
+        await userMetaRef.set({'duplicateCleanupVersion': 1}, SetOptions(merge: true));
+        return;
+      }
+
+      final plan = TransactionIdentityService.planDuplicateCleanup(allTransactions);
+      debugPrint('[MigrationService] Found ${plan.duplicatesFound} duplicate transactions to clean up.');
+
+      for (final tx in plan.transactionsToUpdate) {
+        await transactionRepo.updateTransaction(tx);
+      }
+
+      for (final id in plan.duplicateIdsToDelete) {
+        await transactionRepo.deleteTransaction(id);
+      }
+
+      await userMetaRef.set({'duplicateCleanupVersion': 1}, SetOptions(merge: true));
+      debugPrint('[MigrationService] Duplicate cleanup complete.');
+    } catch (e) {
+      debugPrint('[MigrationService] Duplicate cleanup failed: $e');
     }
   }
 

@@ -85,6 +85,33 @@ class BudgetRepository {
     await collection.doc(budget.id).update(data);
   }
 
+  Future<Budget?> ensureDefaultBudget() async {
+    final collection = _budgetsCollection;
+    if (collection == null) return null;
+
+    final snapshot = await collection.get();
+    final budgets = snapshot.docs.map((doc) => Budget.fromMap(doc.data(), documentId: doc.id)).toList();
+    
+    final totalBudgetIndex = budgets.indexWhere((b) => b.category == 'Total');
+    if (totalBudgetIndex != -1) {
+      return budgets[totalBudgetIndex];
+    }
+
+    final now = DateTime.now();
+    final docRef = collection.doc();
+    final defaultBudget = Budget(
+      id: docRef.id,
+      category: 'Total',
+      amount: 10000.0,
+      period: 'monthly',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    await docRef.set(defaultBudget.toMap());
+    return defaultBudget;
+  }
+
   Future<void> deleteBudget(String id) async {
     final collection = _budgetsCollection;
     if (collection == null) return;

@@ -77,7 +77,7 @@ class ExpenseParser {
   );
 
   static final RegExp _msgIdRegex = RegExp(
-    r'(?:upi\s*ref(?:\s*no\.?)?|upi\s*txn(?:\s*id)?|txn\s*(?:id|ref|no\.?)|transaction\s*(?:id|ref|no\.?)|ref\s*(?:no\.?|num|id)?|reference\s*(?:no\.?|num|id)?|utr(?:\s*no\.?)?|rrn(?:\s*no\.?)?|imps\s*(?:ref|no\.?)?|neft\s*(?:ref|no\.?)?|msg\s*id|msgid)\s*[:#-]?\s*([a-zA-Z0-9]+)',
+    r'(?:upi\s*ref(?:\s*(?:no\.?|num|id))?|upi\s*txn(?:\s*(?:id|ref|no\.?))?|transaction\s*(?:id|ref|no\.?|num)?|txn\s*(?:id|ref|no\.?|num)?|reference\s*(?:no\.?|num|id)?|\bref\b(?:\s*(?:no\.?|num|id))?|utr(?:\s*(?:no\.?|num|id))?|rrn(?:\s*(?:no\.?|num|id))?|imps\s*(?:ref|no\.?|num|id)?|neft\s*(?:ref|no\.?|num|id)?|msg\s*id|msgid)\s*[:#-]?\s*([a-zA-Z0-9]+)',
     caseSensitive: false,
   );
   
@@ -429,9 +429,14 @@ class ExpenseParser {
       final cleaned = raw.replaceAll(RegExp(r'^[^\w]+|[^\w]+$'), '');
       if (cleaned.length < 2 || cleaned.length > 35) continue;
       
-      // Reject common stop words
+      // Reject common stop words, OTPs, and non-reference terms
       final lower = cleaned.toLowerCase();
-      if (['is', 'for', 'on', 'to', 'at', 'in', 'the', 'and', 'rs', 'inr', 'debited', 'credited', 'avlbl', 'bal', 'balance', 'account'].contains(lower)) {
+      if (const {
+        'is', 'for', 'on', 'to', 'at', 'in', 'the', 'and', 'rs', 'inr',
+        'debited', 'credited', 'avlbl', 'bal', 'balance', 'account',
+        'your', 'with', 'by', 'via', 'from', 'alert', 'otp', 'code',
+        'secret', 'password', 'pin', 'not', 'you', 'dear'
+      }.contains(lower)) {
         continue;
       }
       return cleaned;

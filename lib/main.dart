@@ -4,11 +4,13 @@ import 'theme/theme_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/auth_wrapper.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Load theme before Firebase — fast local read, no flicker
   await themeController.load();
+  await NotificationService().initialize();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

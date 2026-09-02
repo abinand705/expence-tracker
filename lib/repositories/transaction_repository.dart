@@ -1,16 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/transaction.dart' as model;
 
 class TransactionRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instanceFor(
-    app: Firebase.app(),
-    databaseId: 'moneytrack',
-  );
+  FirebaseFirestore? __firestore;
+  FirebaseFirestore get _firestore {
+    __firestore ??= FirebaseFirestore.instanceFor(
+      app: Firebase.app(),
+      databaseId: 'moneytrack',
+    );
+    return __firestore!;
+  }
+
+  FirebaseAuth? __auth;
+  FirebaseAuth get _auth {
+    __auth ??= FirebaseAuth.instance;
+    return __auth!;
+  }
+
+  @visibleForTesting
+  void setInstancesForTesting(FirebaseFirestore firestore, FirebaseAuth auth) {
+    __firestore = firestore;
+    __auth = auth;
+  }
 
   String get _uid {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user == null) {
       throw Exception('User is not authenticated');
     }

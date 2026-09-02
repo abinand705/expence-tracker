@@ -81,6 +81,9 @@ class FakeTransactionRepository implements TransactionRepository {
 
   @override
   Stream<List<model_tx.Transaction>> watchTransactions() => Stream.value(transactions.values.toList());
+
+  @override
+  void setInstancesForTesting(dynamic firestore, dynamic auth) {}
 }
 
 class FakeAccountRepository implements AccountRepository {

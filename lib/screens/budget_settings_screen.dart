@@ -32,6 +32,7 @@ class _BudgetSettingsScreenState extends State<BudgetSettingsScreen> {
 
   Future<void> _loadData() async {
     try {
+      await _budgetRepo.ensureDefaultBudget();
       final results = await Future.wait([
         _budgetRepo.getBudgets(),
         _categoryRepo.getCategories(),

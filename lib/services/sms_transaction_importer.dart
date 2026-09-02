@@ -145,11 +145,7 @@ class SmsTransactionImporter {
       // Load existing transactions to evaluate deduplication
       List<model_tx.Transaction> existingTransactions = [];
       try {
-        if (accountId != null) {
-          existingTransactions = await transactionRepo.getTransactionsForAccount(accountId);
-        } else {
-          existingTransactions = await transactionRepo.getTransactions();
-        }
+        existingTransactions = await transactionRepo.getTransactions();
       } catch (_) {}
 
       // Multi-level Transaction Identity Evaluation

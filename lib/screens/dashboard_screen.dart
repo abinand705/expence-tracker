@@ -23,6 +23,7 @@ import '../widgets/dashboard/budget_progress_card.dart';
 import '../widgets/dashboard/spending_trend_card.dart';
 import '../widgets/dashboard/spend_categories_card.dart';
 import 'budget_settings_screen.dart';
+import '../services/notification_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onSeeAllClicked;
@@ -110,6 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _monthlyBudget = null; // No total budget found
             }
           });
+          _checkBudgetAlert();
         }
       },
       onError: (e) {}
@@ -165,6 +167,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _currentMonthCredited = currentCredited;
       _spendChange = change;
     });
+    _checkBudgetAlert();
+  }
+
+  void _checkBudgetAlert() {
+    final target = _monthlyBudget?.amount ?? 10000.0;
+    if (target > 0 && _currentMonthSpend > 0) {
+      NotificationService().checkAndNotifyBudget(
+        currentSpend: _currentMonthSpend,
+        budgetLimit: target,
+      );
+    }
   }
 
   @override
@@ -193,6 +206,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         // Continue if it fails, don't crash dashboard
       }
     }
+
+    try {
+      await _budgetRepo.ensureDefaultBudget();
+    } catch (_) {}
 
     try {
       final userName = await _userRepo.getUserName();
@@ -243,7 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       greeting = 'Good afternoon, $_userName';
     }
     
-    final monthlyTarget = _monthlyBudget?.amount ?? 0.0;
+    final monthlyTarget = _monthlyBudget?.amount ?? 10000.0;
     final isWithinTarget = monthlyTarget == 0.0 ? true : _currentMonthSpend <= monthlyTarget;
 
     return Scaffold(
