@@ -6,7 +6,7 @@ import 'package:expense_tracker/models/transaction.dart';
 void main() {
   group('AnalyticsService', () {
     final analytics = AnalyticsService();
-    final now = DateTime.now();
+    final now = DateTime(2026, 9, 15, 12, 0);
 
     final testTransactions = [
       Transaction(

@@ -125,17 +125,18 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
   }
 
   void _confirmBlock(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
+        backgroundColor: cs.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.xl)),
         title: Text('Block this sender?', style: AppTypography.headlineMd),
         content: Text("You won't see new messages from them.", style: AppTypography.bodyLg),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: AppTypography.bodyLg.copyWith(color: AppColors.primaryContainer)),
+            child: Text('Cancel', style: AppTypography.bodyLg.copyWith(color: cs.primary)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -156,9 +157,10 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
 
   void _showOptionsModal(BuildContext context) {
     final currentConv = _getCurrentConv();
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
@@ -169,7 +171,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
             children: [
               const SizedBox(height: AppSpacing.sm),
               ListTile(
-                leading: const Icon(Icons.search, color: AppColors.primaryContainer),
+                leading: Icon(Icons.search, color: cs.primary),
                 title: Text('Search', style: AppTypography.bodyLg),
                 onTap: () {
                   Navigator.pop(context);
@@ -182,7 +184,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               ListTile(
                 leading: Icon(
                   currentConv.isMuted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
-                  color: AppColors.primaryContainer,
+                  color: cs.primary,
                 ),
                 title: Text(
                   currentConv.isMuted ? 'Unmute Notifications' : 'Mute Notifications',
@@ -194,7 +196,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: AppColors.primaryContainer),
+                leading: Icon(Icons.delete_outline, color: cs.primary),
                 title: Text('Clear Chat', style: AppTypography.bodyLg),
                 onTap: () {
                   Navigator.pop(context);
@@ -212,11 +214,11 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-                child: Divider(color: Theme.of(context).colorScheme.onSurfaceVariant, height: 24),
+                child: Divider(color: cs.onSurfaceVariant, height: 24),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel', style: AppTypography.bodyLg.copyWith(color: AppColors.primaryContainer, fontWeight: FontWeight.bold)),
+                child: Text('Cancel', style: AppTypography.bodyLg.copyWith(color: cs.primary, fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: AppSpacing.sm),
             ],
@@ -228,11 +230,12 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       
       appBar: _isSearching
           ? AppBar(
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: cs.surface,
               elevation: 1,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back),
@@ -251,16 +254,16 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                 decoration: InputDecoration(
                   hintText: 'Search...',
                   border: InputBorder.none,
-                  hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  hintStyle: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
                 ),
-                style: AppTypography.bodyLg,
+                style: AppTypography.bodyLg.copyWith(color: cs.onSurface),
               ),
               actions: [
                 if (_matchIndices.isNotEmpty) ...[
                   Center(
                     child: Text(
                       '${_currentMatchIndex + 1} of ${_matchIndices.length}',
-                      style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ),
                   IconButton(
@@ -287,9 +290,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
               ],
             )
           : AppBar(
-              backgroundColor: Theme.of(context).colorScheme.surface,
+              backgroundColor: cs.surface,
               elevation: 1,
-              iconTheme: const IconThemeData(color: AppColors.onSurface),
+              iconTheme: IconThemeData(color: cs.onSurface),
               titleSpacing: 0,
               title: Row(
                 children: [
@@ -305,10 +308,10 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.conversation.senderName, style: AppTypography.headlineMd),
+                      Text(widget.conversation.senderName, style: AppTypography.headlineMd.copyWith(color: cs.onSurface)),
                       Text(
                         widget.conversation.senderNumber,
-                        style: AppTypography.labelMuted,
+                        style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -358,9 +361,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(right: AppSpacing.xs),
                             child: ActionChip(
-                              label: Text(text, style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
-                              backgroundColor: Theme.of(context).colorScheme.surface,
-                              side: BorderSide.none,
+                              label: Text(text, style: AppTypography.bodyMd.copyWith(color: cs.primary)),
+                              backgroundColor: cs.surface,
+                              side: BorderSide(color: cs.outlineVariant.withAlpha(50)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               onPressed: () {
                                 _messageController.text = text;
@@ -380,9 +383,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(right: AppSpacing.xs),
                             child: ActionChip(
-                              label: Text(text, style: AppTypography.bodyMd.copyWith(color: AppColors.primary)),
-                              backgroundColor: Theme.of(context).colorScheme.surface,
-                              side: BorderSide.none,
+                              label: Text(text, style: AppTypography.bodyMd.copyWith(color: cs.primary)),
+                              backgroundColor: cs.surface,
+                              side: BorderSide(color: cs.outlineVariant.withAlpha(50)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                               onPressed: () {
                                 ScaffoldMessenger.of(context).showSnackBar(
@@ -396,7 +399,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                     ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
-                    color: Theme.of(context).colorScheme.surface,
+                    color: cs.surface,
                     child: SafeArea(
                       child: Row(
                         children: [
@@ -405,11 +408,12 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                               controller: _messageController,
                               minLines: 1,
                               maxLines: 4,
+                              style: AppTypography.bodyLg.copyWith(color: cs.onSurface),
                               decoration: InputDecoration(
                                 hintText: 'Type an SMS message...',
-                                hintStyle: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                hintStyle: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
                                 filled: true,
-                                fillColor: Theme.of(context).colorScheme.surface,
+                                fillColor: cs.surfaceContainerLowest,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(20),
                                   borderSide: BorderSide.none,
@@ -420,9 +424,9 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                           ),
                           const SizedBox(width: AppSpacing.sm),
                           CircleAvatar(
-                            backgroundColor: _canSend ? AppColors.smsPrimary : Theme.of(context).colorScheme.surface,
+                            backgroundColor: _canSend ? AppColors.smsPrimary : cs.surfaceContainerHighest,
                             child: IconButton(
-                              icon: const Icon(Icons.send, color: Colors.white, size: 20),
+                              icon: Icon(Icons.send, color: _canSend ? Colors.white : cs.onSurfaceVariant, size: 20),
                               onPressed: _canSend ? _sendMessage : null,
                             ),
                           ),
@@ -440,6 +444,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
   }
 
   Widget _buildMessageBubble(Message msg, bool isBankSender, int index, Conversation conv) {
+    final cs = Theme.of(context).colorScheme;
     bool showDateHeader = false;
     if (index == 0) {
       showDateHeader = true;
@@ -455,11 +460,11 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
     final timeStr = DateFormat.jm().format(msg.timestamp);
     final isHighlighted = _isSearching && _matchIndices.isNotEmpty && _currentMatchIndex != -1 && _matchIndices[_currentMatchIndex] == index;
     final bubbleColor = isHighlighted 
-        ? AppColors.primaryContainer 
-        : (msg.isMe ? AppColors.smsPrimary : Theme.of(context).colorScheme.surface);
+        ? cs.primaryContainer 
+        : (msg.isMe ? AppColors.smsPrimary : cs.surface);
     final textColor = isHighlighted
-        ? Colors.white
-        : (msg.isMe ? Colors.white : AppColors.onSurface);
+        ? (msg.isMe ? Colors.white : cs.onPrimaryContainer)
+        : (msg.isMe ? Colors.white : cs.onSurface);
         
     final parsed = ExpenseParser.parse(msg.text);
 
@@ -470,10 +475,10 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              color: cs.surface,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Text(_formatDateHeader(msg.timestamp), style: AppTypography.labelMuted),
+            child: Text(_formatDateHeader(msg.timestamp), style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),
           ),
           const SizedBox(height: AppSpacing.sm),
         ],
@@ -491,7 +496,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                 if (!msg.isMe && isBankSender)
                   Padding(
                     padding: const EdgeInsets.only(right: 4, bottom: 4),
-                    child: Icon(Icons.currency_rupee, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    child: Icon(Icons.currency_rupee, size: 14, color: cs.onSurfaceVariant),
                   ),
                 Flexible(
                   child: Container(
@@ -516,7 +521,7 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                         Text(
                           timeStr,
                           style: AppTypography.labelMuted.copyWith(
-                            color: msg.isMe || isHighlighted ? Colors.white70 : AppColors.outline,
+                            color: msg.isMe || isHighlighted ? Colors.white70 : cs.onSurfaceVariant,
                             fontSize: 10,
                           ),
                         ),
@@ -539,10 +544,16 @@ class _ConversationViewScreenState extends State<ConversationViewScreen> {
                     SnackBar(content: Text('Added ₹${parsed.amount.toStringAsFixed(0)} to expenses!')),
                   );
                 },
-                icon: const Icon(Icons.add, size: 16, color: AppColors.onPrimaryContainer),
-                label: Text('Add ₹${parsed.amount.toStringAsFixed(0)} to Expenses', style: AppTypography.labelMuted.copyWith(fontWeight: FontWeight.bold, color: AppColors.onPrimaryContainer)),
+                icon: Icon(Icons.add, size: 16, color: cs.primary),
+                label: Text(
+                  'Add ₹${parsed.amount.toStringAsFixed(0)} to Expenses',
+                  style: AppTypography.labelMuted.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: cs.primary,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryContainer.withValues(alpha: 0.15),
+                  backgroundColor: cs.primary.withAlpha(35),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

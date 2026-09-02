@@ -134,19 +134,26 @@ class _AppearanceSetting extends StatelessWidget {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final mode in [ThemeMode.system, ThemeMode.light, ThemeMode.dark])
-                    RadioListTile<ThemeMode>(
-                      title: Text(_labelFor(mode), style: AppTypography.bodyLg),
-                      value: mode,
-                      groupValue: selected,
-                      activeColor: Theme.of(context).colorScheme.primaryContainer,
-                      onChanged: (val) async {
-                        if (val != null) {
-                          setState(() => selected = val);
-                          await themeController.setThemeMode(val);
-                        }
-                      },
+                  RadioGroup<ThemeMode>(
+                    groupValue: selected,
+                    onChanged: (val) async {
+                      if (val != null) {
+                        setState(() => selected = val);
+                        await themeController.setThemeMode(val);
+                      }
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final mode in [ThemeMode.system, ThemeMode.light, ThemeMode.dark])
+                          RadioListTile<ThemeMode>(
+                            title: Text(_labelFor(mode), style: AppTypography.bodyLg),
+                            value: mode,
+                            activeColor: Theme.of(context).colorScheme.primaryContainer,
+                          ),
+                      ],
                     ),
+                  ),
                 ],
               ),
               actions: [
@@ -381,15 +388,22 @@ class _ExpenseCycleSettingState extends State<_ExpenseCycleSetting> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (final option in ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'])
-                      RadioListTile<String>(
-                        title: Text(option[0].toUpperCase() + option.substring(1), style: AppTypography.bodyLg),
-                        value: option,
-                        groupValue: selected,
-                        onChanged: (val) {
-                          if (val != null) setState(() => selected = val);
-                        },
+                    RadioGroup<String>(
+                      groupValue: selected,
+                      onChanged: (val) {
+                        if (val != null) setState(() => selected = val);
+                      },
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final option in ['daily', 'weekly', 'monthly', 'quarterly', 'yearly', 'custom'])
+                            RadioListTile<String>(
+                              title: Text(option[0].toUpperCase() + option.substring(1), style: AppTypography.bodyLg),
+                              value: option,
+                            ),
+                        ],
                       ),
+                    ),
                     if (selected == 'custom')
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),

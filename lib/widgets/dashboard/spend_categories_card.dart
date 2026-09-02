@@ -83,7 +83,7 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
         children: [
           Text(
             'Spend Categories',
-            style: AppTypography.headlineMd.copyWith(color: cs.primaryContainer),
+            style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
           ),
           const SizedBox(height: AppSpacing.xl),
           Row(
@@ -120,19 +120,19 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
                 child: Column(
                   children: [
                     if (pFood > 0) ...[
-                      _buildLegendItem(context, 'Food', '${(pFood * 100).toStringAsFixed(0)}%', const Color(0xFFC2185B)),
+                      _buildLegendItem(context, 'Food', '₹${food.toStringAsFixed(0)} (${(pFood * 100).toStringAsFixed(0)}%)', const Color(0xFFC2185B)),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     if (pShop > 0) ...[
-                      _buildLegendItem(context, 'Shopping', '${(pShop * 100).toStringAsFixed(0)}%', const Color(0xFF7B1FA2)),
+                      _buildLegendItem(context, 'Shopping', '₹${shopping.toStringAsFixed(0)} (${(pShop * 100).toStringAsFixed(0)}%)', const Color(0xFF7B1FA2)),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     if (pBills > 0) ...[
-                      _buildLegendItem(context, 'Bills', '${(pBills * 100).toStringAsFixed(0)}%', const Color(0xFF1976D2)),
+                      _buildLegendItem(context, 'Bills', '₹${bills.toStringAsFixed(0)} (${(pBills * 100).toStringAsFixed(0)}%)', const Color(0xFF1976D2)),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     if (pOthers > 0) ...[
-                      _buildLegendItem(context, 'Others', '${(pOthers * 100).toStringAsFixed(0)}%', const Color(0xFFF57C00)),
+                      _buildLegendItem(context, 'Others', '₹${others.toStringAsFixed(0)} (${(pOthers * 100).toStringAsFixed(0)}%)', const Color(0xFFF57C00)),
                     ],
                     if (displayTotal == 0)
                       Text('No data this month', style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),

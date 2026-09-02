@@ -36,12 +36,23 @@ void main() {
       expect(result.type, TransactionType.expense);
     });
 
-    test('extracts account number and normalizes to last 4 digits', () {
+    test('extracts account number with variable lengths (3, 4, 5+ digits)', () {
       expect(ExpenseParser.extractAccountNumber('Acct XXXX1234 debited'), '1234');
-      expect(ExpenseParser.extractAccountNumber('Acct 80544 debited'), '0544');
-      expect(ExpenseParser.extractAccountNumber('Acct 12344 debited'), '2344');
-      expect(ExpenseParser.extractAccountNumber('ending in 1234'), '1234');
-      expect(ExpenseParser.extractAccountNumber('Acct 001234'), '1234');
+      expect(ExpenseParser.extractAccountNumber('Your A/C XX123 has been credited'), '123');
+      expect(ExpenseParser.extractAccountNumber('Acct ending 123'), '123');
+      expect(ExpenseParser.extractAccountNumber('account ending in 123'), '123');
+      expect(ExpenseParser.extractAccountNumber('account ending with 123'), '123');
+      expect(ExpenseParser.extractAccountNumber('a/c ...123 debited'), '123');
+      expect(ExpenseParser.extractAccountNumber('account ...123 credited'), '123');
+      expect(ExpenseParser.extractAccountNumber('acct ...123'), '123');
+      expect(ExpenseParser.extractAccountNumber('AC XXXXX123 debited'), '123');
+      expect(ExpenseParser.extractAccountNumber('XXXX123 debited'), '123');
+      expect(ExpenseParser.extractAccountNumber('XX123 debited'), '123');
+      expect(ExpenseParser.extractAccountNumber('XX XX 123 debited'), '123');
+      expect(ExpenseParser.extractAccountNumber('Acct XXXXX12345 debited'), '12345');
+      expect(ExpenseParser.extractAccountNumber('Acct XXXX99123 debited'), '99123');
+      expect(ExpenseParser.extractAccountNumber('from your 0711-BANK OF BARODA'), '0711');
+      expect(ExpenseParser.extractAccountNumber('from your 123-BANK OF BARODA'), '123');
     });
 
     test('guesses category', () {
@@ -89,6 +100,56 @@ void main() {
       final now = DateTime(2026, 8, 20);
       final result = ExpenseParser.parsePendingDue('₹2,499 has been debited on 25 Aug', now);
       expect(result, isNull);
+    });
+
+    group('Merchant Extraction Regressions', () {
+      test('Paid Rs 250 to AMAZON extracts AMAZON', () {
+        final result = ExpenseParser.parse('Paid Rs 250 to AMAZON');
+        expect(result, isNotNull);
+        expect(result!.merchant, 'AMAZON');
+      });
+
+      test('Rs 250 debited for AMAZON extracts AMAZON', () {
+        final result = ExpenseParser.parse('Rs 250 debited for AMAZON on 12-05');
+        expect(result, isNotNull);
+        expect(result!.merchant, 'AMAZON');
+      });
+
+      test('UPI/AMAZON/123456 extracts AMAZON', () {
+        final result = ExpenseParser.parse('Rs 250 debited via UPI/AMAZON/123456 on 01-01-2026');
+        expect(result, isNotNull);
+        expect(result!.merchant, contains('AMAZON'));
+      });
+
+      test('POS AMAZON Rs 250 extracts AMAZON', () {
+        final result = ExpenseParser.parse('POS AMAZON Rs 250 debited from a/c 1234');
+        expect(result, isNotNull);
+        expect(result!.merchant, 'AMAZON');
+      });
+
+      test('Transferred Rs 500 to RAHUL extracts RAHUL', () {
+        final result = ExpenseParser.parse('Transferred Rs 500 to RAHUL via UPI');
+        expect(result, isNotNull);
+        expect(result!.merchant, 'RAHUL');
+      });
+
+      test('Paid to merchant XYZ extracts XYZ', () {
+        final result = ExpenseParser.parse('Paid to merchant XYZ Rs 150 from account 1234');
+        expect(result, isNotNull);
+        expect(result!.merchant, 'XYZ');
+      });
+
+      test('Rs 250 debited from A/c XXXXX544 does not use account/bank as merchant', () {
+        final result = ExpenseParser.parse('Rs 250 debited from A/c XXXXX544 on 01-01-2026');
+        expect(result, isNotNull);
+        expect(result!.merchant, isNull);
+      });
+
+      test('After debit of Rs 25, your A/c is debited does not use raw sentence as merchant', () {
+        final result = ExpenseParser.parse('After debit of Rs 25, your A/c is debited');
+        expect(result, isNotNull);
+        expect(result!.merchant, isNull);
+      });
     });
   });
 }

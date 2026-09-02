@@ -169,7 +169,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      disabledBackgroundColor: AppColors.primary.withOpacity(0.6),
+                      disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.6),
                       minimumSize: const Size.fromHeight(50),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),

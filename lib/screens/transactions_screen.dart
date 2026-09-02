@@ -61,10 +61,12 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     List<Transaction> filteredTransactions = _allTransactions.where((t) {
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
+        final matchTitle = t.displayTitle.toLowerCase().contains(query);
         final matchMerchant = t.merchant.toLowerCase().contains(query);
-        final matchCategory = t.category.toLowerCase().contains(query);
+        final matchCategory = t.displayCategory.toLowerCase().contains(query) || t.category.toLowerCase().contains(query);
         final matchSubtitle = (t.subtitle ?? '').toLowerCase().contains(query);
-        if (!matchMerchant && !matchCategory && !matchSubtitle) return false;
+        final matchDescription = (t.description ?? '').toLowerCase().contains(query);
+        if (!matchTitle && !matchMerchant && !matchCategory && !matchSubtitle && !matchDescription) return false;
       }
       
       if (_selectedFilter == 'All') return true;
@@ -98,6 +100,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 });
               },
               decoration: InputDecoration(
+                prefixIcon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 hintText: 'Search expenses, merchants...',
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
               ),

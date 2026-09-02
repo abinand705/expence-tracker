@@ -18,6 +18,7 @@ import 'statement_parsers/csv_statement_parser.dart';
 import 'statement_parsers/xlsx_statement_parser.dart';
 import 'statement_parsers/docx_statement_parser.dart';
 import 'statement_parsers/pdf_statement_parser.dart';
+import 'transaction_identity_service.dart';
 
 class BankStatementService {
   final TransactionRepository _transactionRepository = TransactionRepository();
@@ -127,24 +128,35 @@ class BankStatementService {
         if (tx.sourceFingerprint == fingerprint) return true;
         if (tx.id == txId) return true;
         
+        final txRef = TransactionIdentityService.normalizeReference(tx.upiReference);
+        final stRef = TransactionIdentityService.normalizeReference(stTx.reference);
+
+        // Strong Reference match
+        if (stRef.isNotEmpty && txRef.isNotEmpty) {
+          if (stRef == txRef && (tx.accountId == account.id || tx.amount == amount)) {
+            return true;
+          }
+          // Different valid reference IDs must not be merged
+          return false;
+        }
+
         // Probable duplicate check
         // same account, same date (ignore time), same amount, same type
         final sameDay = tx.date.year == stTx.date.year && 
                         tx.date.month == stTx.date.month && 
                         tx.date.day == stTx.date.day;
         
-        if (tx.accountId == account.id && sameDay && tx.amount == amount && tx.type == type) {
-           if (stTx.reference != null && stTx.reference!.isNotEmpty && tx.upiReference == stTx.reference) {
-             return true; // Exact reference match
-           }
-           
-           // If reference is not available, check similar description
-           if ((stTx.reference == null || stTx.reference!.isEmpty) && (tx.upiReference == null || tx.upiReference!.isEmpty)) {
-             // For safety, only consider duplicate if descriptions are very similar
+        if (tx.accountId == account.id && sameDay && (tx.amount - amount).abs() < 0.001 && tx.type == type) {
+           // If reference is not available on one or both, check similar description
+           if (stRef.isEmpty || txRef.isEmpty) {
              final txDesc = tx.description?.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '') ?? '';
              final stDesc = stTx.description.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
              
              if (txDesc.isNotEmpty && stDesc.isNotEmpty && (txDesc.contains(stDesc) || stDesc.contains(txDesc))) {
+               return true;
+             }
+             // Or if within 5 seconds
+             if (tx.date.difference(stTx.date).abs() <= const Duration(seconds: 5)) {
                return true;
              }
            }

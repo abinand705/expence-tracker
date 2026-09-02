@@ -73,7 +73,12 @@ class AnalyticsService {
   }
 
   Map<String, double> calculateCategoryTotals(List<Transaction> transactions, {int? month, int? year, DateTimeRange? range}) {
-    Map<String, double> totals = {};
+    Map<String, double> totals = {
+      'Food': 0.0,
+      'Bills': 0.0,
+      'Shopping': 0.0,
+      'Others': 0.0,
+    };
     for (var t in transactions) {
       if (t.type != TransactionType.expense) continue;
       
@@ -84,7 +89,8 @@ class AnalyticsService {
         if (year != null && t.date.year != year) continue;
       }
 
-      totals[t.category] = (totals[t.category] ?? 0) + t.amount;
+      final displayCat = t.displayCategory;
+      totals[displayCat] = (totals[displayCat] ?? 0) + t.amount;
     }
     return totals;
   }

@@ -8,6 +8,9 @@ import '../widgets/app_drawer.dart';
 import '../services/app_update_service.dart';
 import '../widgets/update_dialog.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+import '../services/sms_service.dart';
+
 class MainLayout extends StatefulWidget {
   const MainLayout({super.key});
 
@@ -22,6 +25,19 @@ class _MainLayoutState extends State<MainLayout> {
   void initState() {
     super.initState();
     _performStartupUpdateCheck();
+    _performStartupSmsScan();
+  }
+
+  Future<void> _performStartupSmsScan() async {
+    try {
+      final status = await Permission.sms.status;
+      if (status.isGranted) {
+        // Non-blocking background SMS scan
+        SmsService().ensureLoaded();
+      }
+    } catch (_) {
+      // Silently fail on background startup check
+    }
   }
 
   Future<void> _performStartupUpdateCheck() async {

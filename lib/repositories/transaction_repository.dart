@@ -106,6 +106,24 @@ class TransactionRepository {
     await docRef.update(data);
   }
 
+  Future<void> updateTransactionTitle(String transactionId, String? customTitle) async {
+    final docRef = _transactionsRef.doc(transactionId);
+    await docRef.update({
+      'customTitle': customTitle,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> updateTransactionCategory(String transactionId, String category) async {
+    final normalized = model.TransactionCategory.normalize(category);
+    final docRef = _transactionsRef.doc(transactionId);
+    await docRef.update({
+      'customCategory': normalized,
+      'category': normalized,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> deleteTransaction(String id) async {
     await _transactionsRef.doc(id).delete();
   }

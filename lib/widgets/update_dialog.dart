@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_app_distribution_platform_interface/firebase_app_distribution_platform_interface.dart';
 import '../services/app_update_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';

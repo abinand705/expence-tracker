@@ -6,12 +6,20 @@ import 'package:permission_handler/permission_handler.dart';
 import '../models/sms_models.dart';
 import '../models/message_settings.dart';
 import 'package:flutter_sms_inbox/flutter_sms_inbox.dart' as inbox;
-import '../services/bank_detection_service.dart';
 import '../utils/expense_parser.dart';
 import '../repositories/transaction_repository.dart';
 import '../services/sms_transaction_importer.dart';
 
 
+
+enum SmsLoadingState {
+  notLoaded,
+  loading,
+  loaded,
+  empty,
+  permissionDenied,
+  error,
+}
 
 class SmsService extends ChangeNotifier {
   static final SmsService _instance = SmsService._internal();
@@ -26,8 +34,29 @@ class SmsService extends ChangeNotifier {
   }
 
   final List<Conversation> _conversations = [];
+  SmsLoadingState _loadingState = SmsLoadingState.notLoaded;
+  String? _errorMessage;
+  Future<void>? _activeLoadFuture;
+
+  SmsLoadingState get loadingState => _loadingState;
+  bool get isLoading => _loadingState == SmsLoadingState.loading;
+  String? get errorMessage => _errorMessage;
   
   List<Conversation> get conversations => _conversations;
+
+  @visibleForTesting
+  void setLoadingStateForTesting(SmsLoadingState state) {
+    _loadingState = state;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setConversationsForTesting(List<Conversation> convs) {
+    _conversations.clear();
+    _conversations.addAll(convs);
+    _loadingState = convs.isEmpty ? SmsLoadingState.empty : SmsLoadingState.loaded;
+    notifyListeners();
+  }
   
   List<Conversation> get deletedConversations => 
       _conversations.where((c) => c.isDeleted).toList();
@@ -123,7 +152,6 @@ class SmsService extends ChangeNotifier {
   }
 
   final Map<String, String> _contactCache = {};
-  bool _isLoadingSms = false;
 
   Future<void> _loadContacts() async {
     try {
@@ -170,18 +198,41 @@ class SmsService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<void> loadDeviceSms() async {
-    if (_isLoadingSms) {
-      debugPrint('[SmsService] already loading SMS, skipping');
+  Future<void> ensureLoaded() async {
+    if (_activeLoadFuture != null) {
+      return _activeLoadFuture!;
+    }
+    if (_loadingState == SmsLoadingState.loaded || _loadingState == SmsLoadingState.empty) {
       return;
     }
+    return loadDeviceSms();
+  }
+
+  Future<void> loadDeviceSms() async {
+    if (_activeLoadFuture != null) {
+      debugPrint('[SmsService] already loading SMS, joining active future');
+      return _activeLoadFuture!;
+    }
     
-    _isLoadingSms = true;
+    _activeLoadFuture = _performLoadDeviceSms();
+    try {
+      await _activeLoadFuture;
+    } finally {
+      _activeLoadFuture = null;
+    }
+  }
+
+  Future<void> _performLoadDeviceSms() async {
+    _loadingState = SmsLoadingState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
     debugPrint('[SmsService] loadDeviceSms START');
     final status = await Permission.sms.status;
     if (!status.isGranted) {
       debugPrint('[SmsService] SMS permission not granted');
-      _isLoadingSms = false;
+      _loadingState = SmsLoadingState.permissionDenied;
+      notifyListeners();
       return;
     }
 
@@ -218,7 +269,6 @@ class SmsService extends ChangeNotifier {
       
       final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal];
       int colorIndex = 0;
-      final bankDetectionService = BankDetectionService();
       
       final Map<String, List<Message>> allBankMessages = {};
       int excludedFinancialCount = 0;
@@ -279,27 +329,30 @@ class SmsService extends ChangeNotifier {
         debugPrint('[SmsService] financial messages selected: $totalBankMessages');
         debugPrint('[SmsService] excluded financial-looking messages: $excludedFinancialCount');
         try {
-          // Process to discover accounts and import transactions
-          await bankDetectionService.processAllMessagesForDiscovery(allBankMessages);
-          debugPrint('[SmsService] bank discovery completed');
-          
           final repo = TransactionRepository();
           final importer = SmsTransactionImporter(transactionRepo: repo);
           final summary = await importer.importAllBankMessages(_conversations);
-          debugPrint('[SmsService] transaction import completed: $summary');
+          debugPrint('[SmsService] transaction import and balance sync completed: $summary');
         } catch (e) {
-          debugPrint('[SmsService] bank discovery or import failed: $e');
+          debugPrint('[SmsService] bank import failed: $e');
         }
       }
       
       _applyAutoDelete();
       await _loadContacts();
+
+      if (_conversations.isEmpty) {
+        _loadingState = SmsLoadingState.empty;
+      } else {
+        _loadingState = SmsLoadingState.loaded;
+      }
       notifyListeners();
       
     } catch (e) {
       debugPrint('[SmsService] loadDeviceSms failed: $e');
-    } finally {
-      _isLoadingSms = false;
+      _loadingState = SmsLoadingState.error;
+      _errorMessage = e.toString();
+      notifyListeners();
     }
   }
 

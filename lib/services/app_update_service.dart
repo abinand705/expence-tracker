@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:developer' as developer;
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_distribution/firebase_app_distribution.dart' as fad;
 import 'package:firebase_app_distribution_platform_interface/firebase_app_distribution_platform_interface.dart';
 import 'package:package_info_plus/package_info_plus.dart';

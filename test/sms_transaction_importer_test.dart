@@ -231,7 +231,7 @@ void main() {
       expect(savedTx.accountId, isNull);
     });
 
-    test('TEST 5 - Different bank does not map', () async {
+    test('TEST 5 - Different bank does not map and leaves accountId null', () async {
       final msg = Message(
         id: 'canonical_5',
         text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
@@ -241,12 +241,60 @@ void main() {
       final accounts = [
         Account(id: 'random_uid', name: 'SBI', bankName: 'SBI', accountNumber: '1234', accountType: 'Savings', accentColor: const Color(0xFF000000))
       ];
-      // Detected bank is HDFC based on sender
+      // Detected bank is HDFC based on sender, existing account is SBI
       final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
       expect(result, SmsImportResult.imported);
       final savedTx = repo.transactions.values.last;
-      // It will create the hdfc_1234 preliminary id instead of matching random_uid
-      expect(savedTx.accountId, 'hdfc_1234');
+      expect(savedTx.accountId, isNull);
+    });
+
+    test('3-digit suffix maps to registered account', () async {
+      final msg = Message(
+        id: 'msg_3digit',
+        text: 'Rs 750 debited from account ending 123 on 01-01-2026',
+        timestamp: DateTime(2026, 1, 1),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'bob_123_uid', name: 'BOB', bankName: 'Bank of Baroda', accountNumber: '9876543123', accountType: 'Savings', accentColor: const Color(0xFF000000))
+      ];
+      final result = await importer.importMessage(msg, 'BOB Bank', null, null, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      expect(savedTx.accountId, 'bob_123_uid');
+    });
+
+    test('5-digit suffix maps to registered account', () async {
+      final msg = Message(
+        id: 'msg_5digit',
+        text: 'Rs 1200 debited from A/C XXXXX12345 on 01-01-2026',
+        timestamp: DateTime(2026, 1, 1),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'sbi_5digit_uid', name: 'SBI', bankName: 'State Bank of India', accountNumber: '0000012345', accountType: 'Savings', accentColor: const Color(0xFF000000))
+      ];
+      final result = await importer.importMessage(msg, 'SBI Bank', null, null, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      expect(savedTx.accountId, 'sbi_5digit_uid');
+    });
+
+    test('3-digit pending due SIP format resolves account', () async {
+      final msg = Message(
+        id: 'sip_3digit',
+        text: 'Rs 100.00 will be debited on 21 Aug 2026 from your 123-BANK OF BARODA for upcoming SIP #xxxxxxxx in HDFC Small Cap Fund. Ensure balance.',
+        timestamp: DateTime(2026, 8, 20),
+        isMe: false,
+      );
+      final accounts = [
+        Account(id: 'bob_sip_acc', name: 'BOB', bankName: 'Bank of Baroda', accountNumber: '123', accountType: 'Savings', accentColor: const Color(0xFF000000))
+      ];
+      final result = await importer.importMessage(msg, 'BOB Bank', null, dueRepo, accounts);
+      expect(result, SmsImportResult.imported);
+      final savedDue = dueRepo.dues.values.last;
+      expect(savedDue.accountId, 'bob_sip_acc');
+      expect(savedDue.amount, 100.0);
     });
   });
 }

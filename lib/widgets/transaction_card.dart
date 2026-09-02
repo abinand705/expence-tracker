@@ -5,6 +5,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import 'category_icon.dart';
+import 'transaction_detail_dialog.dart';
 
 class TransactionCard extends StatelessWidget {
   final Transaction transaction;
@@ -18,24 +19,10 @@ class TransactionCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        if (transaction.rawMessage != null) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: Text('Message Details', style: AppTypography.headlineMd),
-              content: Text(
-                transaction.rawMessage!,
-                style: AppTypography.bodyMd,
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text('Close', style: AppTypography.labelCaps.copyWith(color: cs.primaryContainer)),
-                ),
-              ],
-            ),
-          );
-        }
+        showDialog(
+          context: context,
+          builder: (ctx) => TransactionDetailDialog(transaction: transaction),
+        );
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.cardGap),
@@ -47,21 +34,21 @@ class TransactionCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            CategoryIcon(category: transaction.category),
+            CategoryIcon(category: transaction.displayCategory),
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    transaction.merchant,
+                    transaction.displayTitle,
                     style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w500),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${DateFormat('MMM dd, hh:mm a').format(transaction.date)} • ${transaction.subtitle ?? transaction.category}',
+                    '${DateFormat('MMM dd, hh:mm a').format(transaction.date)} • ${transaction.displayCategory}${transaction.subtitle != null && transaction.subtitle!.isNotEmpty ? ' • ${transaction.subtitle}' : ''}',
                     style: AppTypography.labelMuted.copyWith(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                 ],

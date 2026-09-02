@@ -40,7 +40,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
       _smsPermissionStatus = status;
     });
     if (status.isGranted) {
-      _smsService.loadDeviceSms();
+      _smsService.ensureLoaded();
     }
   }
 
@@ -75,11 +75,13 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
 
   Future<void> _recheckPermissionOnResume() async {
     final status = await Permission.sms.status;
-    if (status.isGranted && _smsPermissionStatus != PermissionStatus.granted) {
-      setState(() {
-        _smsPermissionStatus = status;
-      });
-      _smsService.loadDeviceSms();
+    if (status.isGranted) {
+      if (_smsPermissionStatus != PermissionStatus.granted) {
+        setState(() {
+          _smsPermissionStatus = status;
+        });
+      }
+      _smsService.ensureLoaded();
     }
   }
 
@@ -106,7 +108,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
           children: [
             const SizedBox(height: AppSpacing.sm),
             ListTile(
-              leading: Icon(conv.isPinned ? Icons.push_pin_outlined : Icons.push_pin, color: AppColors.primaryContainer),
+              leading: Icon(conv.isPinned ? Icons.push_pin_outlined : Icons.push_pin, color: Theme.of(context).colorScheme.primary),
               title: Text(conv.isPinned ? 'Unpin' : 'Pin', style: AppTypography.bodyLg),
               onTap: () {
                 Navigator.pop(context);
@@ -150,7 +152,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
                           title: Text(blocked[index], style: AppTypography.bodyLg),
                           trailing: TextButton(
                             onPressed: () => _smsService.unblockNumber(blocked[index]),
-                            child: Text('Unblock', style: AppTypography.bodyMd.copyWith(color: AppColors.primaryContainer)),
+                            child: Text('Unblock', style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.primary)),
                           ),
                         );
                       },
@@ -159,7 +161,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text('Close', style: AppTypography.bodyLg.copyWith(color: AppColors.primaryContainer)),
+                  child: Text('Close', style: AppTypography.bodyLg.copyWith(color: Theme.of(context).colorScheme.primary)),
                 ),
               ],
             );
@@ -277,7 +279,7 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
             )
           else if (_smsPermissionStatus == PermissionStatus.granted)
             IconButton(
-              icon: const Icon(Icons.sync, color: AppColors.primaryContainer),
+              icon: Icon(Icons.sync, color: Theme.of(context).colorScheme.primary),
               onPressed: _syncTransactions,
               tooltip: 'Sync Transactions',
             ),
@@ -397,9 +399,45 @@ class _SmsInboxScreenState extends State<SmsInboxScreen> with WidgetsBindingObse
               ),
               // List View
               Expanded(
-                child: conversations.isEmpty 
-                  ? Center(child: Text('No messages found.', style: AppTypography.bodyLg))
-                  : ListView.builder(
+                child: _smsService.isLoading && _smsService.conversations.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'Loading messages...',
+                            style: AppTypography.bodyLg.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : (_smsService.loadingState == SmsLoadingState.error && _smsService.conversations.isEmpty)
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.error_outline, size: 48, color: AppColors.errorRed),
+                            const SizedBox(height: AppSpacing.md),
+                            Text('Unable to load messages.', style: AppTypography.headlineMd),
+                            const SizedBox(height: AppSpacing.md),
+                            ElevatedButton(
+                              onPressed: () => _smsService.loadDeviceSms(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryContainer,
+                                foregroundColor: AppColors.onPrimaryContainer,
+                              ),
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : conversations.isEmpty 
+                      ? Center(child: Text('No messages found.', style: AppTypography.bodyLg))
+                      : ListView.builder(
                       padding: const EdgeInsets.only(bottom: 100),
                       itemCount: conversations.length,
                       itemBuilder: (context, index) {

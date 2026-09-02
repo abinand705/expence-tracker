@@ -42,8 +42,8 @@ class BankDetectionService {
     BankDefinition(
       id: 'bob',
       displayName: 'Bank of Baroda',
-      senderPatterns: ['bobsms'],
-      contentPatterns: ['bank of baroda', 'bob'],
+      senderPatterns: ['bobsms', 'bob', 'baroda'],
+      contentPatterns: ['bank of baroda', 'bob', 'baroda'],
       accentColor: const Color(0xFFF05A28), // Bank of Baroda orange-red
     ),
     BankDefinition(
@@ -77,8 +77,8 @@ class BankDetectionService {
     BankDefinition(
       id: 'kgbank',
       displayName: 'Kerala Gramin Bank',
-      senderPatterns: ['kgbank'],
-      contentPatterns: ['kerala gramin bank', 'kg bank'],
+      senderPatterns: ['kgbank', 'keralagrameena', 'keralagramin'],
+      contentPatterns: ['kerala grameena bank', 'kerala gramin bank', 'kg bank', 'kgbank'],
       accentColor: const Color(0xFF006B3F), // Approximate green
     ),
   ];
@@ -103,6 +103,20 @@ class BankDetectionService {
     final Map<String, List<Message>> messagesByAccount = {};
     final Map<String, BankDefinition> accountBankMap = {};
 
+    // Clean up and migrate any legacy duplicate auto-discovered accounts
+    try {
+      await _accountRepo.migrateAndCleanupAutoDiscoveredAccounts();
+    } catch (_) {}
+
+    // Fetch existing accounts so resolver can map messages to canonical accounts
+    final existingAccounts = await _accountRepo.getAccounts();
+    if (existingAccounts.isEmpty) {
+      debugPrint('[BankDetection] No existing user accounts found. Skipping discovery balance updates.');
+      return;
+    }
+
+    final Map<String, Account> existingAccountsMap = { for (var acc in existingAccounts) acc.id: acc };
+
     final resolver = SmsAccountResolver();
 
     for (final entry in senderToMessages.entries) {
@@ -120,6 +134,7 @@ class BankDetectionService {
           sender: sender,
           messageText: msg.text,
           bank: bank,
+          existingAccounts: existingAccounts,
         );
         
         if (accountId == null) continue;
@@ -129,17 +144,13 @@ class BankDetectionService {
       }
     }
 
-    debugPrint('[BankDetection] unique accounts discovered from SMS: ${messagesByAccount.length}');
-
-    // Fetch existing accounts so we can do authority logic
-    final existingAccounts = await _accountRepo.getAccounts();
-    final Map<String, Account> existingAccountsMap = { for (var acc in existingAccounts) acc.id: acc };
+    debugPrint('[BankDetection] unique matched accounts for SMS balances: ${messagesByAccount.length}');
 
     for (final entry in messagesByAccount.entries) {
       final accountId = entry.key;
-      final bank = accountBankMap[accountId]!;
-      final last4 = accountId.split('_').last;
-      
+      final existingAcc = existingAccountsMap[accountId];
+      if (existingAcc == null) continue; // Never create new accounts from SMS
+
       // Sort messages by timestamp descending (newest first)
       final sortedMessages = entry.value..sort((a, b) => b.timestamp.compareTo(a.timestamp));
       
@@ -156,72 +167,43 @@ class BankDetectionService {
         }
       }
 
-      final existingAcc = existingAccountsMap[accountId];
-      
-      if (existingAcc == null) {
-        // Account does not exist, create it
-        final newAccount = Account(
-          id: accountId,
-          name: '${bank.displayName} Account',
-          bankName: bank.displayName,
-          accountNumber: last4,
-          accountType: 'Savings',
-          balance: newestValidBalance ?? 0.0,
-          currentBalance: newestValidBalance ?? 0.0,
-          balanceSource: newestValidBalance != null ? 'sms' : 'manual',
-          balanceUpdatedAt: balanceUpdatedAt,
-          accentColor: bank.accentColor,
-          isAutoDiscovered: true,
-          createdAt: DateTime.now(),
-        );
+      if (newestValidBalance != null && balanceUpdatedAt != null) {
+        // Check authority rules
+        bool shouldUpdate = false;
         
-        debugPrint('[BankDetection] creating account: $accountId');
-        try {
-          await _accountRepo.cleanupLegacyAutoDiscoveredAccounts(accountId, bank.id, last4);
-          await _accountRepo.addAccountIfAbsent(newAccount);
-        } catch (e) {
-          debugPrint('[BankDetection] failed to create account $accountId: $e');
+        if (existingAcc.balanceSource == 'statement') {
+          // Statements are more authoritative. Only update if SMS is newer than statement import
+          final statementDate = existingAcc.lastStatementImportAt ?? existingAcc.balanceUpdatedAt;
+          if (statementDate == null || balanceUpdatedAt.isAfter(statementDate)) {
+             shouldUpdate = true;
+          }
+        } else {
+          // If manual or sms, just use the newest one
+          final currentUpdated = existingAcc.balanceUpdatedAt;
+          if (currentUpdated == null || balanceUpdatedAt.isAfter(currentUpdated)) {
+             shouldUpdate = true;
+          }
         }
-      } else {
-        // Account exists. 
-        if (newestValidBalance != null && balanceUpdatedAt != null) {
-          // Check authority rules
-          bool shouldUpdate = false;
-          
-          if (existingAcc.balanceSource == 'statement') {
-            // Statements are more authoritative. Only update if SMS is newer than statement import
-            final statementDate = existingAcc.lastStatementImportAt ?? existingAcc.balanceUpdatedAt;
-            if (statementDate == null || balanceUpdatedAt.isAfter(statementDate)) {
-               shouldUpdate = true;
-            }
-          } else {
-            // If manual or sms, just use the newest one
-            final currentUpdated = existingAcc.balanceUpdatedAt;
-            if (currentUpdated == null || balanceUpdatedAt.isAfter(currentUpdated)) {
-               shouldUpdate = true;
-            }
-          }
 
-          if (shouldUpdate) {
-            debugPrint('[BankDetection] updating balance for account $accountId from SMS ($newestValidBalance)');
-            final updatedAccount = Account(
-              id: existingAcc.id,
-              name: existingAcc.name,
-              bankName: existingAcc.bankName,
-              accountNumber: existingAcc.accountNumber,
-              accountType: existingAcc.accountType,
-              balance: existingAcc.balance, // legacy
-              currentBalance: newestValidBalance,
-              balanceSource: 'sms',
-              balanceUpdatedAt: balanceUpdatedAt,
-              lastStatementImportAt: existingAcc.lastStatementImportAt,
-              currency: existingAcc.currency,
-              accentColor: existingAcc.accentColor,
-              isAutoDiscovered: existingAcc.isAutoDiscovered,
-              createdAt: existingAcc.createdAt,
-            );
-            await _accountRepo.updateAccount(updatedAccount);
-          }
+        if (shouldUpdate) {
+          debugPrint('[BankDetection] updating balance for account $accountId from SMS ($newestValidBalance)');
+          final updatedAccount = Account(
+            id: existingAcc.id,
+            name: existingAcc.name,
+            bankName: existingAcc.bankName,
+            accountNumber: existingAcc.accountNumber,
+            accountType: existingAcc.accountType,
+            balance: existingAcc.balance, // legacy
+            currentBalance: newestValidBalance,
+            balanceSource: 'sms',
+            balanceUpdatedAt: balanceUpdatedAt,
+            lastStatementImportAt: existingAcc.lastStatementImportAt,
+            currency: existingAcc.currency,
+            accentColor: existingAcc.accentColor,
+            isAutoDiscovered: existingAcc.isAutoDiscovered,
+            createdAt: existingAcc.createdAt,
+          );
+          await _accountRepo.updateAccount(updatedAccount);
         }
       }
     }

@@ -7,10 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../services/bank_statement_service.dart';
-import '../services/analytics_service.dart';
-import '../repositories/transaction_repository.dart';
 import '../repositories/pending_due_repository.dart';
-import '../models/transaction.dart';
 import '../models/pending_due.dart';
 import 'import_statement_preview_screen.dart';
 
@@ -23,17 +20,13 @@ class MyAccountsScreen extends StatefulWidget {
 
 class _MyAccountsScreenState extends State<MyAccountsScreen> {
   final AccountRepository _accountRepo = AccountRepository();
-  final TransactionRepository _transactionRepo = TransactionRepository();
   final PendingDueRepository _dueRepo = PendingDueRepository();
-  final AnalyticsService _analyticsService = AnalyticsService();
 
   List<Account> _accounts = [];
-  List<Transaction> _transactions = [];
   List<PendingDue> _pendingDues = [];
   
   bool _isLoading = true;
   StreamSubscription<List<Account>>? _accountSubscription;
-  StreamSubscription<List<Transaction>>? _transactionSubscription;
   StreamSubscription<List<PendingDue>>? _dueSubscription;
 
   @override
@@ -55,12 +48,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       },
     );
 
-    _transactionSubscription = _transactionRepo.watchTransactions().listen(
-      (transactions) {
-        if (mounted) setState(() => _transactions = transactions);
-      },
-    );
-
     _dueSubscription = _dueRepo.watchPendingDues().listen(
       (dues) {
         if (mounted) {
@@ -75,7 +62,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   @override
   void dispose() {
     _accountSubscription?.cancel();
-    _transactionSubscription?.cancel();
     _dueSubscription?.cancel();
     super.dispose();
   }
@@ -87,19 +73,18 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     if (_isLoading) {
       return Scaffold(
-        
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.menu),
             onPressed: () => Scaffold.of(context).openDrawer(),
           ),
           title: Text('My Accounts', style: AppTypography.headlineMd),
-          
           elevation: 0,
         ),
-        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        body: Center(child: CircularProgressIndicator(color: cs.primary)),
       );
     }
 
@@ -107,7 +92,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
 
     return Scaffold(
-      
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
@@ -116,12 +100,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
           },
         ),
         title: Text('My Accounts', style: AppTypography.headlineMd),
-        
         elevation: 0,
       ),
       body: RefreshIndicator(
         onRefresh: _refreshAccounts,
-        color: AppColors.primary,
+        color: cs.primary,
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
           child: Column(
@@ -133,7 +116,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               const SizedBox(height: AppSpacing.xl),
               Text(
                 'Linked Accounts',
-                style: AppTypography.headlineMd.copyWith(color: AppColors.primaryContainer),
+                style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
               ),
               const SizedBox(height: AppSpacing.md),
               if (_accounts.isEmpty)
@@ -170,11 +153,12 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   }
 
   Widget _buildNetWorthCard(BuildContext context, NumberFormat formatter, double totalNetWorth) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: AppShadows.level1,
       ),
@@ -183,12 +167,12 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         children: [
           Text(
             'TOTAL NET WORTH',
-            style: AppTypography.labelCaps.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            style: AppTypography.labelCaps.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             formatter.format(totalNetWorth),
-            style: AppTypography.displayCurrency.copyWith(color: AppColors.primaryContainer, fontWeight: FontWeight.bold),
+            style: AppTypography.displayCurrency.copyWith(color: cs.primary, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: AppSpacing.lg),
           Row(
@@ -201,10 +185,10 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                       const SnackBar(content: Text('Balances updated.')),
                     );
                   },
-                  icon: const Icon(Icons.sync, color: AppColors.onPrimary, size: 16),
-                  label: Text('Refresh Balances', style: AppTypography.labelCaps.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.w600)),
+                  icon: Icon(Icons.sync, color: cs.onPrimary, size: 16),
+                  label: Text('Refresh Balances', style: AppTypography.labelCaps.copyWith(color: cs.onPrimary, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
+                    backgroundColor: cs.primary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
@@ -215,11 +199,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () => _showAddAccountModal(context),
-                  icon: Icon(Icons.add, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 16),
-                  label: Text('Add Manual Account', style: AppTypography.labelCaps.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600)),
+                  icon: Icon(Icons.add, color: cs.onSurfaceVariant, size: 16),
+                  label: Text('Add Manual Account', style: AppTypography.labelCaps.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Theme.of(context).colorScheme.surface),
+                    side: BorderSide(color: cs.outlineVariant.withAlpha(80)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
@@ -231,7 +215,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  Widget _buildStatsCard(context) {
+  Widget _buildStatsCard(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -303,9 +287,10 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     required IconData icon,
     bool isNegative = false,
   }) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: cs.surface,
         borderRadius: BorderRadius.circular(12),
         boxShadow: AppShadows.level1,
       ),
@@ -331,11 +316,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(bankName, style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w600, color: AppColors.primaryContainer)),
+                    Text(bankName, style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface)),
                     const SizedBox(height: 2),
                     Text(
                       '$accountType • $accountNumber',
-                      style: AppTypography.labelMuted.copyWith(fontSize: 11),
+                      style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant, fontSize: 11),
                     ),
                   ],
                 ),
@@ -346,7 +331,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                   Text(
                     balance,
                     style: AppTypography.headlineMd.copyWith(
-                      color: isNegative ? AppColors.errorRed : Theme.of(context).colorScheme.onSurface,
+                      color: isNegative ? AppColors.errorRed : cs.onSurface,
                       fontSize: 16,
                     ),
                   ),
@@ -360,10 +345,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   }
 
   Widget _buildLinkAnotherBankButton(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => _showAddAccountModal(context),
       child: CustomPaint(
-        painter: DashedRectPainter(color: Theme.of(context).colorScheme.onSurfaceVariant, strokeWidth: 1, gap: 5),
+        painter: DashedRectPainter(color: cs.outlineVariant.withAlpha(120), strokeWidth: 1, gap: 5),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
@@ -373,15 +359,15 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
+                  color: cs.surface,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.link, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                child: Icon(Icons.link, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Text('Link another bank', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600, color: AppColors.primaryContainer)),
+              Text('Link another bank', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 4),
-              Text('Securely connect via Open Banking', style: AppTypography.labelMuted),
+              Text('Securely connect via Open Banking', style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),
             ],
           ),
         ),
@@ -390,9 +376,10 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   }
 
   void _showAccountOptionsModal(BuildContext context, Account account) {
+    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: cs.surface,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) {
         return SafeArea(
@@ -401,21 +388,21 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurfaceVariant, borderRadius: BorderRadius.circular(2))),
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurfaceVariant, borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: AppSpacing.lg),
-                Text(account.name, style: AppTypography.headlineMd),
+                Text(account.name, style: AppTypography.headlineMd.copyWith(color: cs.onSurface)),
                 const SizedBox(height: AppSpacing.lg),
                 ListTile(
-                  leading: const Icon(Icons.edit, color: AppColors.primaryContainer),
-                  title: const Text('Edit Account'),
+                  leading: Icon(Icons.edit, color: cs.primary),
+                  title: Text('Edit Account', style: TextStyle(color: cs.onSurface)),
                   onTap: () {
                     Navigator.pop(context);
                     _showAddAccountModal(context, accountToEdit: account);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.file_upload, color: AppColors.primary),
-                  title: const Text('Import Bank Statement'),
+                  leading: Icon(Icons.file_upload, color: cs.primary),
+                  title: Text('Import Bank Statement', style: TextStyle(color: cs.onSurface)),
                   onTap: () async {
                     Navigator.pop(context);
                     await _handleImportStatement(context, account);
@@ -528,7 +515,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                           accountNumber: accountNoController.text,
                           accountType: accountType,
                           balance: double.tryParse(balanceController.text) ?? 0.0,
-                          accentColor: accountToEdit?.accentColor ?? AppColors.primaryContainer,
+                          accentColor: accountToEdit?.accentColor ?? Theme.of(context).colorScheme.primary,
                           createdAt: accountToEdit?.createdAt ?? DateTime.now(),
                         );
 
@@ -553,11 +540,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryContainer,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
                       minimumSize: const Size(double.infinity, 50),
                     ),
-                    child: isSaving ? const CircularProgressIndicator(color: Colors.white) : Text(accountToEdit == null ? 'Save Account' : 'Update Account'),
+                    child: isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.onPrimary) : Text(accountToEdit == null ? 'Save Account' : 'Update Account'),
                   ),
                 ],
               ),

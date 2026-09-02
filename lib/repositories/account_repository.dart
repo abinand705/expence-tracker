@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/account.dart';
+import '../services/sms_account_resolver.dart';
 
 class AccountRepository {
   static final AccountRepository _instance = AccountRepository._internal();
@@ -131,6 +132,60 @@ class AccountRepository {
       debugPrint('[AccountRepository] account write successful: ${docRef.id}');
       return true;
     });
+  }
+
+  Future<int> migrateAndCleanupAutoDiscoveredAccounts() async {
+    final collection = _accountsCollection;
+    final uid = _auth.currentUser?.uid;
+    if (collection == null || uid == null) return 0;
+
+    try {
+      final snapshot = await collection.get();
+      final allAccounts = snapshot.docs.map((doc) => Account.fromMap(doc.data())).toList();
+
+      final realAccounts = allAccounts.where((a) => !a.isAutoDiscovered).toList();
+      final autoAccounts = allAccounts.where((a) => a.isAutoDiscovered).toList();
+
+      if (realAccounts.isEmpty || autoAccounts.isEmpty) return 0;
+
+      final resolver = SmsAccountResolver();
+      int cleanedCount = 0;
+
+      for (final autoAcc in autoAccounts) {
+        final matchedRealId = resolver.resolveAccount(
+          bankIdOrName: autoAcc.bankName,
+          rawAccountOrSuffix: autoAcc.accountNumber,
+          accounts: realAccounts,
+        );
+
+        if (matchedRealId != null && matchedRealId != autoAcc.id) {
+          debugPrint('[AccountRepository] migrating duplicate auto-discovered account ${autoAcc.id} -> $matchedRealId');
+          
+          // Re-point transactions
+          final txCollection = _firestore.collection('users').doc(uid).collection('transactions');
+          final txSnapshot = await txCollection.where('accountId', isEqualTo: autoAcc.id).get();
+          for (final doc in txSnapshot.docs) {
+            await doc.reference.update({'accountId': matchedRealId});
+          }
+
+          // Re-point pending dues
+          final duesCollection = _firestore.collection('users').doc(uid).collection('pending_dues');
+          final duesSnapshot = await duesCollection.where('accountId', isEqualTo: autoAcc.id).get();
+          for (final doc in duesSnapshot.docs) {
+            await doc.reference.update({'accountId': matchedRealId});
+          }
+
+          // Delete the duplicate auto-discovered account document
+          await collection.doc(autoAcc.id).delete();
+          cleanedCount++;
+        }
+      }
+
+      return cleanedCount;
+    } catch (e) {
+      debugPrint('[AccountRepository] Error during auto-discovered accounts migration: $e');
+      return 0;
+    }
   }
 
   Future<void> cleanupLegacyAutoDiscoveredAccounts(String canonicalAccountId, String bankId, String last4) async {
