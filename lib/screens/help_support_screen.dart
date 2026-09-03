@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -23,10 +26,20 @@ class HelpSupportScreen extends StatefulWidget {
 }
 
 class _HelpSupportScreenState extends State<HelpSupportScreen> {
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   bool _isSubmitting = false;
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    _nameController.text = user?.displayName ?? '';
+    _emailController.text = user?.email ?? '';
+  }
 
   static const List<FaqItem> _faqList = [
     FaqItem(
@@ -68,6 +81,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   @override
   void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
     _messageController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -75,6 +90,23 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   Future<void> _submitMessage() async {
     final message = _messageController.text.trim();
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your name.')),
+      );
+      return;
+    }
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email address.')),
+      );
+      return;
+    }
+
     if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a message to send.')),
@@ -88,28 +120,77 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
     try {
       final user = FirebaseAuth.instance.currentUser;
-      final userName = user?.displayName ?? 'Anonymous';
-      final userEmail = user?.email ?? 'No email';
+      final apiKey = dotenv.env['FORMCONNECT_API_KEY'] ??
+          const String.fromEnvironment('FORMCONNECT_API_KEY', defaultValue: 'fc_live_09a08edc9b883d8dcf9735c5a71d2099');
+      final apiUrl = dotenv.env['FORMCONNECT_API_URL'] ??
+          const String.fromEnvironment('FORMCONNECT_API_URL', defaultValue: 'https://formconnect.onrender.com');
 
-      await FirebaseFirestore.instance.collection('support_messages').add({
-        'userId': user?.uid,
-        'name': userName,
-        'email': userEmail,
-        'message': message,
-        'createdAt': FieldValue.serverTimestamp(),
-        'status': 'new',
-      });
+      final uri = Uri.parse('$apiUrl/api/submit');
 
-      if (mounted) {
-        _messageController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Message sent successfully. We will get back to you soon!')),
-        );
+      final payload = {
+        'apiKey': apiKey,
+        'data': {
+          'name': name,
+          'email': email,
+          'message': message,
+          'project': 'MoneyTrack',
+          if (user?.uid != null) 'userId': user!.uid,
+        },
+      };
+
+      final response = await http.post(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(payload),
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        // Optional non-blocking background backup to Firestore if online
+        FirebaseFirestore.instance.collection('support_messages').add({
+          'userId': user?.uid,
+          'name': name,
+          'email': email,
+          'message': message,
+          'createdAt': FieldValue.serverTimestamp(),
+          'status': 'submitted_to_formconnect',
+        }).then((_) {}, onError: (_) {});
+
+        if (mounted) {
+          _messageController.clear();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Message sent successfully! We will get back to you soon.'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        String errorMsg = 'Failed to submit form (${response.statusCode})';
+        try {
+          final resJson = jsonDecode(response.body);
+          if (resJson is Map && resJson['message'] != null) {
+            errorMsg = resJson['message'].toString();
+          }
+        } catch (_) {}
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send message: $e')),
+          SnackBar(
+            content: Text('Submission error: $e'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
@@ -123,10 +204,6 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = user?.displayName ?? 'User Name';
-    final userEmail = user?.email ?? 'user@example.com';
-
     final filteredFaqs = _faqList.where((faq) {
       if (_searchQuery.isEmpty) return true;
       final query = _searchQuery.toLowerCase();
@@ -222,12 +299,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                   
                   _buildTextFieldLabel('Name'),
                   const SizedBox(height: AppSpacing.xs),
-                  _buildTextField(userName, readOnly: true),
+                  _buildTextField('Your name', controller: _nameController),
                   const SizedBox(height: AppSpacing.sm),
                   
                   _buildTextFieldLabel('Email Address'),
                   const SizedBox(height: AppSpacing.xs),
-                  _buildTextField(userEmail, readOnly: true),
+                  _buildTextField('Your email', controller: _emailController),
                   const SizedBox(height: AppSpacing.sm),
                   
                   _buildTextFieldLabel('Message'),
