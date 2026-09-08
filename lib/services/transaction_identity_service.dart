@@ -98,6 +98,12 @@ class TransactionIdentityService {
     return ref.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
   }
 
+  /// Normalize raw SMS body text for byte-identical comparisons
+  static String normalizeRawMessage(String? text) {
+    if (text == null) return '';
+    return text.trim();
+  }
+
   /// Normalize account representation (extract last 3 digits or identifier)
   static String normalizeAccount(String? rawAccount) {
     if (rawAccount == null || rawAccount.trim().isEmpty) return 'unknown';
@@ -241,6 +247,26 @@ class TransactionIdentityService {
       // RULE 2: If incoming has reference ID but existing has a different reference ID -> Skip
       if (incomingRef.isNotEmpty && existingRef.isNotEmpty && incomingRef != existingRef) {
         continue;
+      }
+
+      // RESEND GUARD: Check for carrier resend with identical normalized SMS body within 30 minutes
+      // Runs regardless of whether account or reference ID resolved.
+      final incomingNormalizedRaw = normalizeRawMessage(rawText);
+      final existingNormalizedRaw = normalizeRawMessage(tx.rawMessage);
+      if (incomingNormalizedRaw.isNotEmpty &&
+          existingNormalizedRaw.isNotEmpty &&
+          incomingNormalizedRaw == existingNormalizedRaw) {
+        final diff = txDate.difference(tx.date).abs();
+        if (diff <= const Duration(minutes: 30)) {
+          developer.log(
+            '[TransactionIdentity] Resend guard detected identical SMS within 30m window\nExisting transaction: ${tx.id}\nTime diff: ${diff.inSeconds}s',
+            name: 'TransactionIdentity',
+          );
+          return TransactionIdentityResult.exactDuplicate(
+            matchedId: tx.id,
+            canonicalId: tx.id,
+          );
+        }
       }
 
       // RULE 3: Fallback when NEITHER has a reference ID

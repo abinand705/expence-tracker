@@ -8,6 +8,7 @@ import 'package:expense_tracker/services/analytics_service.dart';
 import 'package:expense_tracker/models/sms_models.dart';
 import 'package:expense_tracker/widgets/transaction_detail_dialog.dart';
 import 'package:expense_tracker/widgets/transaction_card.dart';
+import 'package:expense_tracker/models/account.dart';
 
 class MockTransactionRepository implements TransactionRepository {
   final Map<String, model_tx.Transaction> transactions = {};
@@ -235,6 +236,14 @@ void main() {
 
     test('10. SMS Rescan preserves user-assigned category', () async {
       final importer = SmsTransactionImporter(transactionRepo: repo, pendingDueRepo: dueRepo);
+      final hdfcAcc = Account(
+        id: 'acc_hdfc',
+        name: 'HDFC Bank',
+        bankName: 'HDFC Bank',
+        accountNumber: '',
+        accountType: 'Savings',
+        accentColor: Colors.blue,
+      );
       final msg = Message(
         id: 'msg_cat_scan',
         text: 'Rs. 450 debited for Swiggy on 01-09-2026',
@@ -243,7 +252,7 @@ void main() {
       );
 
       // 1. Initial import (guessed as food)
-      final res1 = await importer.importMessage(msg, 'HDFC Bank');
+      final res1 = await importer.importMessage(msg, 'HDFC Bank', null, null, [hdfcAcc]);
       expect(res1, SmsImportResult.imported);
       final txId = repo.transactions.keys.first;
 
@@ -252,7 +261,7 @@ void main() {
       expect(repo.transactions[txId]!.displayCategory, 'Others');
 
       // 3. Repeated SMS scan
-      final res2 = await importer.importMessage(msg, 'HDFC Bank');
+      final res2 = await importer.importMessage(msg, 'HDFC Bank', null, null, [hdfcAcc]);
       expect(res2, SmsImportResult.duplicate);
 
       // Verify category is still Others

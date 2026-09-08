@@ -1,3 +1,12 @@
+// ARCHITECTURE NOTE: BankDetectionService.identifyBank() is used for
+// informational/UI purposes only (e.g. bank name suggestions in account
+// creation). It is NO LONGER used for SMS transaction account matching.
+//
+// All SMS → account matching now goes through:
+//   SmsAccountIndex → AccountSmsMatcher → SmsRecognitionRule
+//
+// processAllMessagesForDiscovery() is deprecated and not called from the
+// SMS scanning pipeline.
 import 'package:flutter/material.dart';
 import '../models/account.dart';
 import '../models/sms_models.dart';
@@ -81,6 +90,34 @@ class BankDetectionService {
       contentPatterns: ['kerala grameena bank', 'kerala gramin bank', 'kg bank', 'kgbank'],
       accentColor: const Color(0xFF006B3F), // Approximate green
     ),
+    BankDefinition(
+      id: 'canara',
+      displayName: 'Canara Bank',
+      senderPatterns: ['canbnk', 'canara', 'cnrbk', 'cnrsms', 'cbssms'],
+      contentPatterns: ['canara bank', 'canara'],
+      accentColor: const Color(0xFF005DAA), // Canara Bank blue
+    ),
+    BankDefinition(
+      id: 'pnb',
+      displayName: 'Punjab National Bank',
+      senderPatterns: ['pnbsms', 'pnb'],
+      contentPatterns: ['punjab national bank', 'pnb'],
+      accentColor: const Color(0xFFA20C32),
+    ),
+    BankDefinition(
+      id: 'kotak',
+      displayName: 'Kotak Mahindra Bank',
+      senderPatterns: ['kotakb', 'kotak'],
+      contentPatterns: ['kotak bank', 'kotak mahindra', 'kotak'],
+      accentColor: const Color(0xFFED1C24),
+    ),
+    BankDefinition(
+      id: 'union',
+      displayName: 'Union Bank of India',
+      senderPatterns: ['unionb', 'uboi', 'union'],
+      contentPatterns: ['union bank of india', 'union bank', 'uboi'],
+      accentColor: const Color(0xFF003874),
+    ),
   ];
 
   BankDefinition? identifyBank(String sender, String content) {
@@ -92,6 +129,15 @@ class BankDetectionService {
     return null;
   }
 
+  /// @Deprecated — NOT called from SMS scanning pipeline.
+  ///
+  /// SMS account matching now uses SmsAccountIndex + AccountSmsMatcher.
+  /// This method is kept only for potential future informational/diagnostic use.
+  /// It does NOT create accounts (already enforced inside).
+  @Deprecated(
+    'Not used in SMS scanning pipeline. Use SmsAccountIndex.build() + '
+    'AccountSmsMatcher.match() for account resolution during SMS import.',
+  )
   Future<void> processAllMessagesForDiscovery(Map<String, List<Message>> senderToMessages) async {
     int totalMessages = 0;
     for (final msgs in senderToMessages.values) {

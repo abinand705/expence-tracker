@@ -37,10 +37,12 @@ class SmsService extends ChangeNotifier {
   SmsLoadingState _loadingState = SmsLoadingState.notLoaded;
   String? _errorMessage;
   Future<void>? _activeLoadFuture;
+  SmsImportSummary? _lastImportSummary;
 
   SmsLoadingState get loadingState => _loadingState;
   bool get isLoading => _loadingState == SmsLoadingState.loading;
   String? get errorMessage => _errorMessage;
+  SmsImportSummary? get lastImportSummary => _lastImportSummary;
   
   List<Conversation> get conversations => _conversations;
 
@@ -222,13 +224,23 @@ class SmsService extends ChangeNotifier {
     }
   }
 
+  /// Triggers a full scan of device SMS to discover and import transactions
+  /// for configured bank accounts and update their balances in Firestore.
+  Future<SmsImportSummary> syncTransactions({String? targetAccountId}) async {
+    await loadDeviceSms();
+    return _lastImportSummary ?? SmsImportSummary();
+  }
+
   Future<void> _performLoadDeviceSms() async {
     _loadingState = SmsLoadingState.loading;
     _errorMessage = null;
     notifyListeners();
 
     debugPrint('[SmsService] loadDeviceSms START');
-    final status = await Permission.sms.status;
+    var status = await Permission.sms.status;
+    if (!status.isGranted) {
+      status = await Permission.sms.request();
+    }
     if (!status.isGranted) {
       debugPrint('[SmsService] SMS permission not granted');
       _loadingState = SmsLoadingState.permissionDenied;
@@ -331,8 +343,8 @@ class SmsService extends ChangeNotifier {
         try {
           final repo = TransactionRepository();
           final importer = SmsTransactionImporter(transactionRepo: repo);
-          final summary = await importer.importAllBankMessages(_conversations);
-          debugPrint('[SmsService] transaction import and balance sync completed: $summary');
+          _lastImportSummary = await importer.importAllBankMessages(_conversations);
+          debugPrint('[SmsService] transaction import and balance sync completed: $_lastImportSummary');
         } catch (e) {
           debugPrint('[SmsService] bank import failed: $e');
         }

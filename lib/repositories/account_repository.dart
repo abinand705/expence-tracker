@@ -63,6 +63,10 @@ class AccountRepository {
     return Account.fromMap(doc.data()!);
   }
 
+  /// Adds a new account explicitly created by the user through the UI.
+  ///
+  /// IMPORTANT: This method MUST ONLY be called from account creation UI
+  /// (AccountCreateScreen). It must NEVER be called from SMS processing.
   Future<String> addAccount(Account account) async {
     final collection = _accountsCollection;
     if (collection == null) throw Exception('User not authenticated');
@@ -80,6 +84,7 @@ class AccountRepository {
       bankName: account.bankName,
       accountNumber: account.accountNumber,
       accountType: account.accountType,
+      nickname: account.nickname,
       balance: account.balance,
       currentBalance: account.currentBalance,
       balanceSource: account.balanceSource,
@@ -87,15 +92,29 @@ class AccountRepository {
       lastStatementImportAt: account.lastStatementImportAt,
       currency: account.currency,
       accentColor: account.accentColor,
-      isAutoDiscovered: account.isAutoDiscovered,
+      isAutoDiscovered: false, // User-created accounts are NEVER auto-discovered
+      smsTrackingEnabled: false, // SMS tracking starts OFF — user must configure rules
       createdAt: account.createdAt ?? DateTime.now(),
       updatedAt: account.updatedAt ?? DateTime.now(),
     );
 
     await docRef.set(newAccount.toMap());
+    debugPrint('[AccountRepository] user created account: ${docRef.id}');
     return docRef.id;
   }
 
+  /// @Deprecated — DO NOT call from SMS processing.
+  ///
+  /// This method exists for safe migration of legacy auto-discovered accounts
+  /// and must NEVER be called from any SMS scanning code path.
+  ///
+  /// SMS scanning must NEVER create accounts. If you're calling this from SMS
+  /// code, you have a critical architectural violation.
+  @Deprecated(
+    'Never call from SMS processing. '
+    'Account creation is only allowed via AccountCreateScreen + addAccount(). '
+    'SMS processing must only USE existing accounts, never create them.',
+  )
   Future<bool> addAccountIfAbsent(Account account) async {
     final collection = _accountsCollection;
     if (collection == null) throw Exception('User not authenticated');
@@ -115,6 +134,7 @@ class AccountRepository {
         bankName: account.bankName,
         accountNumber: account.accountNumber,
         accountType: account.accountType,
+        nickname: account.nickname,
         balance: account.balance,
         currentBalance: account.currentBalance,
         balanceSource: account.balanceSource,
@@ -123,6 +143,7 @@ class AccountRepository {
         currency: account.currency,
         accentColor: account.accentColor,
         isAutoDiscovered: account.isAutoDiscovered,
+        smsTrackingEnabled: false, // Never auto-enable SMS tracking
         createdAt: account.createdAt ?? DateTime.now(),
         updatedAt: account.updatedAt ?? DateTime.now(),
       );
@@ -198,12 +219,9 @@ class AccountRepository {
 
     for (final doc in snapshot.docs) {
       final docId = doc.id;
-      // Skip the canonical one
       if (docId == canonicalAccountId) continue;
 
-      // Check if it's a legacy version of the same bank and ending with the same last4
       if (docId.startsWith('${bankId}_') && docId.endsWith(last4)) {
-        // e.g. kgbank_80544 ends with 0544
         debugPrint('[AccountRepository] cleaning up legacy duplicate account: $docId (canonical: $canonicalAccountId)');
         await doc.reference.delete();
       }
@@ -220,6 +238,7 @@ class AccountRepository {
       bankName: account.bankName,
       accountNumber: account.accountNumber,
       accountType: account.accountType,
+      nickname: account.nickname,
       balance: account.balance,
       currentBalance: account.currentBalance,
       balanceSource: account.balanceSource,
@@ -228,6 +247,7 @@ class AccountRepository {
       currency: account.currency,
       accentColor: account.accentColor,
       isAutoDiscovered: account.isAutoDiscovered,
+      smsTrackingEnabled: account.smsTrackingEnabled,
       createdAt: account.createdAt,
       updatedAt: DateTime.now(),
     );

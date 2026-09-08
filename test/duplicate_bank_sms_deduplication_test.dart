@@ -10,6 +10,8 @@ import 'package:expense_tracker/repositories/pending_due_repository.dart';
 import 'package:expense_tracker/services/sms_transaction_importer.dart';
 import 'package:expense_tracker/services/analytics_service.dart';
 import 'package:expense_tracker/services/transaction_identity_service.dart';
+import 'package:expense_tracker/models/sms_recognition_rule.dart';
+import 'package:expense_tracker/repositories/sms_rule_repository.dart';
 import 'package:expense_tracker/utils/expense_parser.dart';
 
 class MockTxRepo implements TransactionRepository {
@@ -114,6 +116,7 @@ void main() {
     late MockTxRepo txRepo;
     late MockAccRepo accRepo;
     late MockDueRepo dueRepo;
+    late SmsRuleRepository ruleRepo;
     late SmsTransactionImporter importer;
 
     final baseAccount = Account(
@@ -126,6 +129,7 @@ void main() {
       currentBalance: 10000.0,
       currency: 'INR',
       accentColor: const Color(0xFF004B8D),
+      smsTrackingEnabled: true,
       createdAt: DateTime(2026, 1, 1),
     );
 
@@ -133,12 +137,26 @@ void main() {
       txRepo = MockTxRepo();
       accRepo = MockAccRepo();
       dueRepo = MockDueRepo();
+      ruleRepo = SmsRuleRepository.inMemory();
       accRepo.accounts[baseAccount.id] = baseAccount;
+      ruleRepo.addRule(SmsRecognitionRule(
+        id: 'rule_hdfc_544',
+        accountId: baseAccount.id,
+        ruleLabel: 'HDFC Rule',
+        accountIdentifier: '544',
+        senderPatterns: ['HDFC', 'HDFCBK', 'HDFC-Bank', 'HDFC Bank'],
+        debitKeywords: const ['debited', 'spent', 'paid', 'purchase'],
+        creditKeywords: const ['credited', 'received', 'deposited'],
+        coversDebit: true,
+        coversCredit: true,
+        createdAt: DateTime.now(),
+      ));
 
       importer = SmsTransactionImporter(
         transactionRepo: txRepo,
         accountRepo: accRepo,
         pendingDueRepo: dueRepo,
+        ruleRepo: ruleRepo,
       );
     });
 
@@ -610,6 +628,93 @@ void main() {
         final parsed = ExpenseParser.extractMessageId('Rs 100 debited from A/c XX544. ${sample.$1}');
         expect(parsed, sample.$2, reason: 'Failed for pattern: ${sample.$1}');
       }
+    });
+
+    test('TEST 21: Resend guard deduplicates resent identical-body SMS with no reference ID or account', () async {
+      // Add a second bank account so resolveAccount cannot disambiguate when account number is absent
+      final secondAccount = Account(
+        id: 'acc_hdfc_999',
+        name: 'HDFC Savings 2',
+        bankName: 'HDFC Bank',
+        accountNumber: 'XXXXXX999',
+        accountType: 'Savings',
+        balance: 5000.0,
+        currentBalance: 5000.0,
+        currency: 'INR',
+        accentColor: const Color(0xFF004B8D),
+        createdAt: DateTime(2026, 1, 1),
+      );
+      accRepo.accounts[secondAccount.id] = secondAccount;
+
+      // SMS body has reference to A/c XX544 with no transaction reference ID
+      const smsBody = 'Rs 250 spent from A/c XX544 at Merchant Store on card.';
+
+      // Initial receipt of SMS
+      final msgA = Message(
+        id: 'sms_carrier_resend_1',
+        text: smsBody,
+        timestamp: DateTime(2026, 9, 5, 14, 0, 0),
+        isMe: false,
+      );
+
+      // Carrier resend: identical message body, received 12 minutes later
+      final msgB = Message(
+        id: 'sms_carrier_resend_2',
+        text: smsBody,
+        timestamp: DateTime(2026, 9, 5, 14, 12, 0),
+        isMe: false,
+      );
+
+      final resA = await importer.importMessage(msgA, 'HDFC Bank');
+      expect(resA, SmsImportResult.imported);
+      expect(txRepo.transactions.length, 1);
+
+      final resB = await importer.importMessage(msgB, 'HDFC Bank');
+      expect(resB, SmsImportResult.duplicate);
+      expect(txRepo.transactions.length, 1);
+    });
+
+    test('TEST 22: Distinct transactions with identical body text hours apart are NOT merged', () async {
+      // Add a second account to ensure no account resolution
+      final secondAccount = Account(
+        id: 'acc_hdfc_999',
+        name: 'HDFC Savings 2',
+        bankName: 'HDFC Bank',
+        accountNumber: 'XXXXXX999',
+        accountType: 'Savings',
+        balance: 5000.0,
+        currentBalance: 5000.0,
+        currency: 'INR',
+        accentColor: const Color(0xFF004B8D),
+        createdAt: DateTime(2026, 1, 1),
+      );
+      accRepo.accounts[secondAccount.id] = secondAccount;
+
+      const smsBody = 'Rs 50 spent from A/c XX544 at Metro Station.';
+
+      // First transaction at 08:00
+      final msgMorning = Message(
+        id: 'sms_metro_morning',
+        text: smsBody,
+        timestamp: DateTime(2026, 9, 5, 8, 0, 0),
+        isMe: false,
+      );
+
+      // Second genuinely distinct transaction at 18:00 (10 hours later)
+      final msgEvening = Message(
+        id: 'sms_metro_evening',
+        text: smsBody,
+        timestamp: DateTime(2026, 9, 5, 18, 0, 0),
+        isMe: false,
+      );
+
+      final resMorning = await importer.importMessage(msgMorning, 'HDFC Bank');
+      expect(resMorning, SmsImportResult.imported);
+      expect(txRepo.transactions.length, 1);
+
+      final resEvening = await importer.importMessage(msgEvening, 'HDFC Bank');
+      expect(resEvening, SmsImportResult.imported);
+      expect(txRepo.transactions.length, 2);
     });
   });
 }

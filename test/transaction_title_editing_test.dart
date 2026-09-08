@@ -5,6 +5,7 @@ import 'package:expense_tracker/repositories/transaction_repository.dart';
 import 'package:expense_tracker/repositories/pending_due_repository.dart';
 import 'package:expense_tracker/services/sms_transaction_importer.dart';
 import 'package:expense_tracker/models/sms_models.dart';
+import 'package:expense_tracker/models/account.dart';
 import 'package:expense_tracker/widgets/transaction_card.dart';
 import 'package:expense_tracker/widgets/transaction_detail_dialog.dart';
 
@@ -191,6 +192,14 @@ void main() {
 
     test('8. Repeated SMS scan preserves existing customTitle', () async {
       final importer = SmsTransactionImporter(transactionRepo: repo, pendingDueRepo: dueRepo);
+      final hdfcAcc = Account(
+        id: 'acc_hdfc',
+        name: 'HDFC Bank',
+        bankName: 'HDFC Bank',
+        accountNumber: '',
+        accountType: 'Savings',
+        accentColor: Colors.blue,
+      );
       final msg = Message(
         id: 'msg_repeat',
         text: 'Rs. 250 debited on 01-09-2026',
@@ -199,7 +208,7 @@ void main() {
       );
 
       // 1. Initial import
-      final res1 = await importer.importMessage(msg, 'HDFC Bank');
+      final res1 = await importer.importMessage(msg, 'HDFC Bank', null, null, [hdfcAcc]);
       expect(res1, SmsImportResult.imported);
       final txId = repo.transactions.keys.first;
 
@@ -208,7 +217,7 @@ void main() {
       expect(repo.transactions[txId]!.customTitle, 'Amazon');
 
       // 3. Re-scan the same SMS
-      final res2 = await importer.importMessage(msg, 'HDFC Bank');
+      final res2 = await importer.importMessage(msg, 'HDFC Bank', null, null, [hdfcAcc]);
       expect(res2, SmsImportResult.duplicate);
 
       // Verify custom title is still Amazon and original SMS is untouched

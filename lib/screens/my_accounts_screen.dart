@@ -2,14 +2,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../repositories/account_repository.dart';
+import '../repositories/sms_rule_repository.dart';
 import '../models/account.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
 import '../services/bank_statement_service.dart';
-import '../repositories/pending_due_repository.dart';
-import '../models/pending_due.dart';
 import 'import_statement_preview_screen.dart';
+import 'account_create_screen.dart';
+import 'account_sms_config_screen.dart';
+import '../services/sms_service.dart';
 
 class MyAccountsScreen extends StatefulWidget {
   const MyAccountsScreen({super.key});
@@ -20,14 +22,15 @@ class MyAccountsScreen extends StatefulWidget {
 
 class _MyAccountsScreenState extends State<MyAccountsScreen> {
   final AccountRepository _accountRepo = AccountRepository();
-  final PendingDueRepository _dueRepo = PendingDueRepository();
+  final SmsRuleRepository _ruleRepo = SmsRuleRepository();
 
   List<Account> _accounts = [];
-  List<PendingDue> _pendingDues = [];
-  
+
   bool _isLoading = true;
   StreamSubscription<List<Account>>? _accountSubscription;
-  StreamSubscription<List<PendingDue>>? _dueSubscription;
+
+  // Cache: accountId → rule count
+  final Map<String, int> _ruleCountCache = {};
 
   @override
   void initState() {
@@ -39,35 +42,34 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             _accounts = accounts;
             _isLoading = false;
           });
+          _loadRuleCounts(accounts);
         }
       },
       onError: (e) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+        if (mounted) setState(() => _isLoading = false);
       },
     );
+  }
 
-    _dueSubscription = _dueRepo.watchPendingDues().listen(
-      (dues) {
+  Future<void> _loadRuleCounts([List<Account>? accounts]) async {
+    final list = accounts ?? _accounts;
+    for (final acc in list) {
+      try {
+        final rules = await _ruleRepo.getRules(acc.id);
         if (mounted) {
-          setState(() {
-            _pendingDues = dues..sort((a, b) => a.dueDate.compareTo(b.dueDate));
-          });
+          setState(() => _ruleCountCache[acc.id] = rules.length);
         }
-      },
-    );
+      } catch (_) {}
+    }
   }
 
   @override
   void dispose() {
     _accountSubscription?.cancel();
-    _dueSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _refreshAccounts() async {
-    // With stream, refresh just delays to give UI feedback
     await Future.delayed(const Duration(milliseconds: 500));
   }
 
@@ -95,9 +97,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: () {
-            Scaffold.of(context).openDrawer();
-          },
+          onPressed: () => Scaffold.of(context).openDrawer(),
         ),
         title: Text('My Accounts', style: AppTypography.headlineMd),
         elevation: 0,
@@ -111,19 +111,25 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
-              const SizedBox(height: AppSpacing.md),
-              _buildStatsCard(context),
-              const SizedBox(height: AppSpacing.xl),
-              Text(
-                'Linked Accounts',
-                style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'My Accounts',
+                    style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
+                  ),
+                  // SMS tracking summary badge
+                  if (_accounts.isNotEmpty)
+                    _buildSmsSummaryChip(cs),
+                ],
               ),
+              const SizedBox(height: AppSpacing.xs),
+              // Info banner
+              _buildSmsBanner(cs),
               const SizedBox(height: AppSpacing.md),
               if (_accounts.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Text('No accounts found. Link a bank account to track balances.', style: AppTypography.bodyLg),
-                )
+                _buildNoAccountsCard(context, cs)
               else
                 ..._accounts.map((acc) {
                   return Padding(
@@ -131,23 +137,74 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                     child: InkWell(
                       onTap: () => _showAccountOptionsModal(context, acc),
                       borderRadius: BorderRadius.circular(12),
-                      child: _buildLinkedAccountCard(context: context,
-                        bankName: acc.bankName,
-                        accountType: acc.accountType,
-                        accountNumber: acc.maskedAccountNumber,
-                        balance: currencyFormatter.format(acc.currentBalance),
-                        accentColor: acc.accentColor,
-                        icon: Icons.account_balance,
+                      child: _buildLinkedAccountCard(
+                        context: context,
+                        account: acc,
+                        ruleCount: _ruleCountCache[acc.id],
                       ),
                     ),
                   );
                 }),
               const SizedBox(height: AppSpacing.lg),
-              _buildLinkAnotherBankButton(context),
+              _buildAddAccountButton(context),
               const SizedBox(height: 100),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSmsSummaryChip(ColorScheme cs) {
+    final smsEnabled = _accounts.where((a) => a.smsTrackingEnabled).length;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: smsEnabled > 0
+            ? AppColors.successGreen.withValues(alpha: 0.1)
+            : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sms,
+              size: 12,
+              color: smsEnabled > 0 ? AppColors.successGreen : cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            '$smsEnabled SMS active',
+            style: AppTypography.labelMuted.copyWith(
+              fontSize: 11,
+              color: smsEnabled > 0 ? AppColors.successGreen : cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSmsBanner(ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, size: 16, color: cs.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'MoneyTrack never auto-creates accounts from SMS. '
+              'Add an account here, then configure SMS rules to enable automatic tracking.',
+              style: AppTypography.bodyMd.copyWith(
+                  color: cs.onSurface, fontSize: 11),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -171,8 +228,10 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            formatter.format(totalNetWorth),
-            style: AppTypography.displayCurrency.copyWith(color: cs.primary, fontWeight: FontWeight.bold),
+            _formatCurrency(totalNetWorth),
+            style: AppTypography.displayCurrency.copyWith(
+                color: totalNetWorth < 0 ? AppColors.errorRed : cs.primary, 
+                fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: AppSpacing.lg),
           Row(
@@ -186,11 +245,14 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                     );
                   },
                   icon: Icon(Icons.sync, color: cs.onPrimary, size: 16),
-                  label: Text('Refresh Balances', style: AppTypography.labelCaps.copyWith(color: cs.onPrimary, fontWeight: FontWeight.w600)),
+                  label: Text('Refresh Balances',
+                      style: AppTypography.labelCaps.copyWith(
+                          color: cs.onPrimary, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cs.primary,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                     elevation: 0,
                   ),
                 ),
@@ -198,13 +260,16 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showAddAccountModal(context),
+                  onPressed: () => _navigateToCreateAccount(context),
                   icon: Icon(Icons.add, color: cs.onSurfaceVariant, size: 16),
-                  label: Text('Add Manual Account', style: AppTypography.labelCaps.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600)),
+                  label: Text('Add Account',
+                      style: AppTypography.labelCaps.copyWith(
+                          color: cs.onSurface, fontWeight: FontWeight.w600)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     side: BorderSide(color: cs.outlineVariant.withAlpha(80)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
               ),
@@ -215,79 +280,54 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  Widget _buildStatsCard(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.errorRed.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.warning_amber_rounded, color: AppColors.errorRed, size: 20),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Text('Pending Dues', style: AppTypography.labelMuted),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (_pendingDues.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              child: Text('No pending dues', style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            )
-          else
-            ..._pendingDues.where((d) => d.dueDate.isAfter(DateTime.now().subtract(const Duration(days: 1)))).map((due) {
-              final formatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
-              final dateFormatter = DateFormat('dd MMM yyyy');
-              // Mask account number to just last 4 if present
-              String maskedAcc = due.accountId != null 
-                 ? '****${due.accountId!.split('_').last}' 
-                 : 'Unknown Account';
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(formatter.format(due.amount), style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold)),
-                        Text(maskedAcc, style: AppTypography.labelMuted),
-                        Text(due.description ?? 'Scheduled debit', style: AppTypography.labelMuted.copyWith(fontSize: 10)),
-                      ],
-                    ),
-                    Text(dateFormatter.format(due.dueDate), style: AppTypography.bodyMd.copyWith(color: AppColors.errorRed)),
-                  ],
-                ),
-              );
-            }),
-        ],
-      ),
-    );
+  String _formatCurrency(double amount) {
+    final numFormat = NumberFormat('#,##0.00');
+    if (amount < 0) {
+      return '-₹ ${numFormat.format(-amount)}';
+    }
+    return '₹ ${numFormat.format(amount)}';
   }
 
-  Widget _buildLinkedAccountCard({required BuildContext context,
-    required String bankName,
-    required String accountType,
-    required String accountNumber,
-    required String balance,
-    required Color accentColor,
-    required IconData icon,
-    bool isNegative = false,
+  Widget _buildLinkedAccountCard({
+    required BuildContext context,
+    required Account account,
+    int? ruleCount,
   }) {
     final cs = Theme.of(context).colorScheme;
+
+    // SMS status
+    Widget smsStatus;
+    if (account.smsTrackingEnabled) {
+      smsStatus = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6, height: 6,
+            decoration: const BoxDecoration(
+                color: AppColors.successGreen, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            'SMS Active${ruleCount != null ? ' ($ruleCount rules)' : ''}',
+            style: AppTypography.labelMuted.copyWith(
+                fontSize: 10, color: AppColors.successGreen),
+          ),
+        ],
+      );
+    } else if (ruleCount != null && ruleCount > 0) {
+      smsStatus = Text(
+        'SMS Disabled',
+        style: AppTypography.labelMuted.copyWith(
+            fontSize: 10, color: cs.onSurfaceVariant),
+      );
+    } else {
+      smsStatus = Text(
+        'SMS Not Configured',
+        style: AppTypography.labelMuted.copyWith(
+            fontSize: 10, color: cs.error.withValues(alpha: 0.8)),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: cs.surface,
@@ -298,7 +338,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: accentColor, width: 4)),
+            border: Border(left: BorderSide(color: account.accentColor, width: 4)),
           ),
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Row(
@@ -306,22 +346,27 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.15),
+                  color: account.accentColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: accentColor),
+                child: Icon(Icons.account_balance, color: account.accentColor),
               ),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(bankName, style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface)),
+                    Text(account.bankName,
+                        style: AppTypography.bodyLg.copyWith(
+                            fontWeight: FontWeight.w600, color: cs.onSurface)),
                     const SizedBox(height: 2),
                     Text(
-                      '$accountType • $accountNumber',
-                      style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant, fontSize: 11),
+                      '${account.accountType} • ${account.maskedAccountNumber}',
+                      style: AppTypography.labelMuted.copyWith(
+                          color: cs.onSurfaceVariant, fontSize: 11),
                     ),
+                    const SizedBox(height: 4),
+                    smsStatus,
                   ],
                 ),
               ),
@@ -329,10 +374,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    balance,
+                    _formatCurrency(account.currentBalance),
                     style: AppTypography.headlineMd.copyWith(
-                      color: isNegative ? AppColors.errorRed : cs.onSurface,
+                      color: account.currentBalance < 0 ? AppColors.errorRed : cs.onSurface,
                       fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -344,16 +390,53 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  Widget _buildLinkAnotherBankButton(BuildContext context) {
+  Widget _buildNoAccountsCard(BuildContext context, ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.account_balance_outlined,
+              size: 48, color: cs.onSurfaceVariant),
+          const SizedBox(height: AppSpacing.md),
+          Text('No accounts yet', style: AppTypography.headlineMd),
+          const SizedBox(height: 4),
+          Text(
+            'Add your bank account to start tracking transactions automatically from SMS.',
+            style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          ElevatedButton.icon(
+            onPressed: () => _navigateToCreateAccount(context),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Account'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.base)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddAccountButton(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return GestureDetector(
-      onTap: () => _showAddAccountModal(context),
+      onTap: () => _navigateToCreateAccount(context),
       child: CustomPaint(
-        painter: DashedRectPainter(color: cs.outlineVariant.withAlpha(120), strokeWidth: 1, gap: 5),
+        painter: DashedRectPainter(
+            color: cs.outlineVariant.withAlpha(120), strokeWidth: 1, gap: 5),
         child: Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
-          color: Colors.transparent, // Ensures the whole area is clickable
+          color: Colors.transparent,
           child: Column(
             children: [
               Container(
@@ -362,12 +445,16 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                   color: cs.surface,
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.link, color: cs.onSurfaceVariant),
+                child: Icon(Icons.add, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: AppSpacing.sm),
-              Text('Link another bank', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.w600, color: cs.onSurface)),
+              Text('Add another account',
+                  style: AppTypography.bodyMd.copyWith(
+                      fontWeight: FontWeight.w600, color: cs.onSurface)),
               const SizedBox(height: 4),
-              Text('Securely connect via Open Banking', style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),
+              Text('Configure SMS rules for automatic tracking',
+                  style:
+                      AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant)),
             ],
           ),
         ),
@@ -375,12 +462,31 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
+  Future<void> _navigateToCreateAccount(BuildContext context,
+      {Account? accountToEdit}) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            AccountCreateScreen(accountToEdit: accountToEdit),
+      ),
+    );
+    if (result == true && mounted) {
+      // Accounts stream will auto-update
+      SmsService().refreshAccounts();
+      _loadRuleCounts();
+    }
+  }
+
   void _showAccountOptionsModal(BuildContext context, Account account) {
     final cs = Theme.of(context).colorScheme;
+    final ruleCount = _ruleCountCache[account.id] ?? 0;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: cs.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
       builder: (context) {
         return SafeArea(
           child: Padding(
@@ -388,36 +494,91 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(width: 40, height: 4, decoration: BoxDecoration(color: cs.onSurfaceVariant, borderRadius: BorderRadius.circular(2))),
+                Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                        color: cs.onSurfaceVariant,
+                        borderRadius: BorderRadius.circular(2))),
                 const SizedBox(height: AppSpacing.lg),
-                Text(account.name, style: AppTypography.headlineMd.copyWith(color: cs.onSurface)),
+                Text(account.bankName,
+                    style: AppTypography.headlineMd.copyWith(color: cs.onSurface)),
+                Text(
+                  '${account.accountType} • ${account.maskedAccountNumber}',
+                  style: AppTypography.labelMuted,
+                ),
                 const SizedBox(height: AppSpacing.lg),
+                ListTile(
+                  leading: Icon(Icons.sms, color: cs.primary),
+                  title: Text('SMS Recognition', style: TextStyle(color: cs.onSurface)),
+                  subtitle: Text(
+                    account.smsTrackingEnabled
+                        ? 'Active — $ruleCount rule${ruleCount != 1 ? "s" : ""}'
+                        : ruleCount > 0
+                            ? 'Disabled — $ruleCount rule${ruleCount != 1 ? "s" : ""} configured'
+                            : 'Not configured',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: account.smsTrackingEnabled
+                          ? AppColors.successGreen
+                          : cs.onSurfaceVariant,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AccountSmsConfigScreen(account: account),
+                      ),
+                    ).then((_) => _loadRuleCounts(_accounts));
+                  },
+                ),
                 ListTile(
                   leading: Icon(Icons.edit, color: cs.primary),
                   title: Text('Edit Account', style: TextStyle(color: cs.onSurface)),
                   onTap: () {
                     Navigator.pop(context);
-                    _showAddAccountModal(context, accountToEdit: account);
+                    _navigateToCreateAccount(context, accountToEdit: account);
                   },
                 ),
                 ListTile(
                   leading: Icon(Icons.file_upload, color: cs.primary),
-                  title: Text('Import Bank Statement', style: TextStyle(color: cs.onSurface)),
+                  title: Text('Import Bank Statement',
+                      style: TextStyle(color: cs.onSurface)),
                   onTap: () async {
                     Navigator.pop(context);
                     await _handleImportStatement(context, account);
                   },
                 ),
+                if (account.isAutoDiscovered)
+                  ListTile(
+                    leading: const Icon(Icons.merge_type, color: Colors.orange),
+                    title: const Text('Auto-Created Account',
+                        style: TextStyle(color: Colors.orange)),
+                    subtitle: const Text(
+                        'This account was auto-created from SMS. Consider creating a manual account and migrating.',
+                        style: TextStyle(fontSize: 11)),
+                    onTap: () => Navigator.pop(context),
+                  ),
                 ListTile(
                   leading: const Icon(Icons.delete, color: AppColors.errorRed),
-                  title: const Text('Delete Account', style: TextStyle(color: AppColors.errorRed)),
+                  title: const Text('Delete Account',
+                      style: TextStyle(color: AppColors.errorRed)),
                   onTap: () async {
                     Navigator.pop(context);
                     try {
                       await _accountRepo.deleteAccount(account.id);
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account deleted')));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Account deleted')));
+                      }
                     } catch (e) {
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Error: $e')));
+                      }
                     }
                   },
                 ),
@@ -429,133 +590,8 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     );
   }
 
-  void _showAddAccountModal(BuildContext context, {Account? accountToEdit}) {
-    final bankNameController = TextEditingController(text: accountToEdit?.bankName ?? '');
-    final accountNoController = TextEditingController(text: accountToEdit?.accountNumber ?? '');
-    final balanceController = TextEditingController(text: accountToEdit?.balance.toString() ?? '');
-    String accountType = accountToEdit?.accountType ?? 'Savings';
-    bool isSaving = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: AppSpacing.lg,
-                right: AppSpacing.lg,
-                top: AppSpacing.lg,
-                bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(accountToEdit == null ? 'Add Manual Account' : 'Edit Account', style: AppTypography.headlineMd),
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: bankNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Bank Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  TextField(
-                    controller: accountNoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Account No (Last 4 digits)',
-                      border: OutlineInputBorder(),
-                    ),
-                    keyboardType: TextInputType.number,
-                    maxLength: 4,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextField(
-                    controller: balanceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Balance',
-                      border: OutlineInputBorder(),
-                      prefixText: '₹ ',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  DropdownButtonFormField<String>(
-                    initialValue: ['Savings', 'Current', 'Credit Card', 'Loan'].contains(accountType) ? accountType : 'Savings',
-                    decoration: const InputDecoration(
-                      labelText: 'Account Type',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: ['Savings', 'Current', 'Credit Card', 'Loan']
-                        .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) accountType = value;
-                    },
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  ElevatedButton(
-                    onPressed: isSaving ? null : () async {
-                      if (bankNameController.text.isEmpty || accountNoController.text.isEmpty || balanceController.text.isEmpty) {
-                        return;
-                      }
-
-                      setModalState(() => isSaving = true);
-                      
-                      try {
-                        final newAccount = Account(
-                          id: accountToEdit?.id ?? '',
-                          name: '${bankNameController.text} Account',
-                          bankName: bankNameController.text,
-                          accountNumber: accountNoController.text,
-                          accountType: accountType,
-                          balance: double.tryParse(balanceController.text) ?? 0.0,
-                          accentColor: accountToEdit?.accentColor ?? Theme.of(context).colorScheme.primary,
-                          createdAt: accountToEdit?.createdAt ?? DateTime.now(),
-                        );
-
-                        if (accountToEdit == null) {
-                          await _accountRepo.addAccount(newAccount);
-                        } else {
-                          await _accountRepo.updateAccount(newAccount);
-                        }
-
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(accountToEdit == null ? 'Account added successfully.' : 'Account updated successfully.')),
-                          );
-                        }
-                      } catch (e) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                        }
-                      } finally {
-                        if (mounted) setModalState(() => isSaving = false);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                      minimumSize: const Size(double.infinity, 50),
-                    ),
-                    child: isSaving ? CircularProgressIndicator(color: Theme.of(context).colorScheme.onPrimary) : Text(accountToEdit == null ? 'Save Account' : 'Update Account'),
-                  ),
-                ],
-              ),
-            );
-          }
-        );
-      },
-    );
-  }
-
-  Future<void> _handleImportStatement(BuildContext context, Account account) async {
+  Future<void> _handleImportStatement(
+      BuildContext context, Account account) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -573,11 +609,10 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
     try {
       final service = BankStatementService();
       final parsedStatement = await service.pickAndParseStatement(account);
-      
-      if (context.mounted) Navigator.pop(context); // close loading dialog
-      
+
+      if (context.mounted) Navigator.pop(context);
+
       if (parsedStatement != null && context.mounted) {
-        // Show preview screen
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -591,7 +626,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         );
       }
     } catch (e) {
-      if (context.mounted) Navigator.pop(context); // close loading dialog
+      if (context.mounted) Navigator.pop(context);
       if (context.mounted) {
         showDialog(
           context: context,
@@ -616,7 +651,8 @@ class DashedRectPainter extends CustomPainter {
   final double strokeWidth;
   final double gap;
 
-  DashedRectPainter({required this.color, required this.strokeWidth, required this.gap});
+  DashedRectPainter(
+      {required this.color, required this.strokeWidth, required this.gap});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -626,12 +662,14 @@ class DashedRectPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final Path path = Path()
-      ..addRRect(RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, size.width, size.height), const Radius.circular(12)));
+      ..addRRect(RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, size.width, size.height),
+          const Radius.circular(12)));
 
     final Path dashedPath = Path();
     bool draw = true;
     double distance = 0;
-    
+
     for (final metric in path.computeMetrics()) {
       while (distance < metric.length) {
         final double nextDistance = distance + gap;
@@ -646,7 +684,7 @@ class DashedRectPainter extends CustomPainter {
       }
       distance = 0;
     }
-    
+
     canvas.drawPath(dashedPath, paint);
   }
 

@@ -43,7 +43,7 @@ class ParsedExpense {
 }
 
 class ExpenseParser {
-  static final RegExp _amountRegex = RegExp(r'(?:rs\.?|inr|₹)\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false);
+  static final RegExp _amountRegex = RegExp(r'(?:rs\.?|inr|₹)\s*[:=\-]?\s*([\d,]+(?:\.\d{1,2})?)', caseSensitive: false);
   
   static final RegExp _debitKeywords = RegExp(
     r'(?:after\s+debit\s+of|debited|debit\s+of|debit|withdrawn|withdrawal|spent|paid|payment|purchase|transferred|sent|deducted|upi\s+debit|atm\s+withdrawal|pos\s+transaction|\bdr\b|dr\.)', 
@@ -56,19 +56,63 @@ class ExpenseParser {
   );
   
   static final RegExp _balRegex = RegExp(
-    r'(?:avl\s*bal|available\s*balance|available\s*bal|a/c\s*balance|a/c\s*bal|bal(?:\s*stands)?|balance|bal)\s*[:-]?\s*(?:is\s+)?(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)', 
-    caseSensitive: false
+    r'(?:total\s+)?'
+    r'(?:avl\.?|avail\.?|available|clear|net|cur(?:rent)?|active|updated|new|a/c|acct|od|overdraft)?'
+    r'\s*\.?\s*'
+    r'bal(?:ance)?\.?(?:\s*stands)?'
+    r'(?:[^\n\r]{0,60}?)'
+    r'(-?\s*(?:rs\.?|inr|₹)\s*[:=\-]?\s*-?|-)'
+    r'\s*'
+    r'([\d,]+(?:\.\d{1,2})?)'
+    r'(\s*(?:\([dD][rR]\.?\)|[dD][rR]\.?|\b[dD][rR]\b|\([cC][rR]\.?\)|[cC][rR]\.?|\b[cC][rR]\b))?',
+    caseSensitive: false,
   );
 
-  static double? parseAvailableBalanceOnly(String text) {
-    final match = _balRegex.firstMatch(text);
-    if (match != null) {
-      final balStr = match.group(1)?.replaceAll(',', '');
-      if (balStr != null) {
-        return double.tryParse(balStr);
-      }
+  static final RegExp _balRegexFallback = RegExp(
+    r'(?:avl\.?|avail\.?|available|clear|net|cur(?:rent)?|active|updated|new|a/c|acct|od|overdraft)?'
+    r'\s*\.?\s*'
+    r'bal(?:ance)?\.?(?:\s*stands)?'
+    r'\s*[:=]\s*'
+    r'(-?\s*(?:rs\.?|inr|₹)?\s*-?)'
+    r'\s*'
+    r'([\d,]+(?:\.\d{1,2})?)'
+    r'(?:\s*(?:rs\.?|inr|₹))?'
+    r'(\s*(?:\([dD][rR]\.?\)|[dD][rR]\.?|\b[dD][rR]\b|\([cC][rR]\.?\)|[cC][rR]\.?|\b[cC][rR]\b))?',
+    caseSensitive: false,
+  );
+
+  static Match? _findBalanceMatch(String text) {
+    return _balRegex.firstMatch(text) ?? _balRegexFallback.firstMatch(text);
+  }
+
+  static double? _parseBalanceFromMatch(Match match, String text) {
+    final group2 = match.group(2);
+    final group1 = match.group(1);
+    final numStr = (group2 != null && RegExp(r'\d').hasMatch(group2))
+        ? group2.replaceAll(',', '')
+        : (group1 != null && RegExp(r'\d').hasMatch(group1) ? group1.replaceAll(',', '') : null);
+    if (numStr == null) return null;
+    final val = double.tryParse(numStr);
+    if (val == null) return null;
+
+    final fullMatchStr = match.group(0) ?? '';
+    final lowerMatch = fullMatchStr.toLowerCase();
+
+    final hasMinus = lowerMatch.contains('-') || (group1 != null && group1.contains('-'));
+    final hasDebit = lowerMatch.contains('dr') && !lowerMatch.contains('draft');
+
+    final endIdx = match.end;
+    final suffixWindow = text.substring(endIdx, (endIdx + 20).clamp(0, text.length)).toLowerCase();
+    final hasSuffixDebit = RegExp(r'^\s*(?:\(dr\.?\)|dr\.?|\bdr\b|debit)', caseSensitive: false).hasMatch(suffixWindow);
+
+    if (hasMinus || hasDebit || hasSuffixDebit) {
+      return -val.abs();
     }
-    return null;
+    return val;
+  }
+
+  static double? parseAvailableBalanceOnly(String text) {
+    return extractBalance(text);
   }
   
   static final RegExp _acRegex = RegExp(
@@ -220,16 +264,13 @@ class ExpenseParser {
 
     // 1. Extract Balance if present
     double? availableBalance;
-    Match? balMatch = _balRegex.firstMatch(text);
+    Match? balMatch = _findBalanceMatch(text);
     int balStart = -1;
     int balEnd = -1;
     if (balMatch != null) {
       balStart = balMatch.start;
       balEnd = balMatch.end;
-      final balStr = balMatch.group(1)?.replaceAll(',', '');
-      if (balStr != null) {
-        availableBalance = double.tryParse(balStr);
-      }
+      availableBalance = _parseBalanceFromMatch(balMatch, text);
     }
 
     // 2. Extract transaction amount (ensuring it is NOT the balance or part of balRegex)
@@ -246,6 +287,25 @@ class ExpenseParser {
         if (parsedVal != null) {
           transactionAmount = parsedVal;
           break; // First valid non-balance currency amount is the transaction amount
+        }
+      }
+    }
+    if (transactionAmount == null) {
+      // Fallback: look for amount directly following debit/credit keywords, e.g. "debited by 150.0"
+      final keywordAmountRegex = RegExp(
+        r'(?:debited|credited|debit|credit|paid|spent|withdrawn|transferred)\s+(?:by|for|of|with)?\s*[:=\-]?\s*(?:rs\.?|inr|₹)?\s*([\d,]+(?:\.\d{1,2})?)',
+        caseSensitive: false,
+      );
+      final kwMatches = keywordAmountRegex.allMatches(text);
+      for (final m in kwMatches) {
+        if (balStart != -1 && m.start >= balStart && m.start < balEnd) continue;
+        final rawAmtStr = m.group(1)?.replaceAll(',', '');
+        if (rawAmtStr != null) {
+          final parsedVal = double.tryParse(rawAmtStr);
+          if (parsedVal != null && parsedVal > 0) {
+            transactionAmount = parsedVal;
+            break;
+          }
         }
       }
     }
@@ -390,29 +450,28 @@ class ExpenseParser {
   }
 
   static double? extractBalance(String text) {
-    final balMatch = _balRegex.firstMatch(text);
+    final balMatch = _findBalanceMatch(text);
     if (balMatch != null) {
-      final balStr = balMatch.group(1)?.replaceAll(',', '');
-      if (balStr != null) return double.tryParse(balStr);
+      return _parseBalanceFromMatch(balMatch, text);
     }
     return null;
   }
 
   static String? extractAccountNumber(String text) {
-    // 1. Check explicit bank format first: e.g. "from your 123-BANK OF BARODA" or "0711-BANK OF BARODA"
-    final explicitBankPrefixRegex = RegExp(r'(?:from your\s+|from\s+)?(\d{3,6})\s*-\s*[A-Za-z]', caseSensitive: false);
-    final explicitMatch = explicitBankPrefixRegex.firstMatch(text);
-    if (explicitMatch != null) {
-      final digits = explicitMatch.group(1)?.replaceAll(RegExp(r'[^0-9]'), '');
+    // 1. Match standard masked or prefixed account number expressions first (e.g. "A/c XXXXX711")
+    final acMatch = _acRegex.firstMatch(text);
+    if (acMatch != null) {
+      final digits = acMatch.group(1)?.replaceAll(RegExp(r'[^0-9]'), '');
       if (digits != null && digits.length >= 3) {
         return digits;
       }
     }
 
-    // 2. Match standard masked or prefixed account number expressions
-    final acMatch = _acRegex.firstMatch(text);
-    if (acMatch != null) {
-      final digits = acMatch.group(1)?.replaceAll(RegExp(r'[^0-9]'), '');
+    // 2. Check explicit bank format fallback: e.g. "from your 123-BANK OF BARODA"
+    final explicitBankPrefixRegex = RegExp(r'(?:from your\s+|from\s+)(\d{3,6})\s*-\s*[A-Za-z]', caseSensitive: false);
+    final explicitMatch = explicitBankPrefixRegex.firstMatch(text);
+    if (explicitMatch != null) {
+      final digits = explicitMatch.group(1)?.replaceAll(RegExp(r'[^0-9]'), '');
       if (digits != null && digits.length >= 3) {
         return digits;
       }
@@ -445,9 +504,9 @@ class ExpenseParser {
   }
 
   static DateTime? extractTransactionTimestamp(String text) {
-    // 1. Time DD-MM-YYYY HH:mm:ss or Time DD/MM/YYYY HH:mm:ss
+    // 1. Time with date: DD-MM-YYYY HH:mm:ss or DD/MM/YYYY HH:mm:ss
     final timeWithDateRegex = RegExp(
-      r'(?:time|date|on|dated)?\s*[:#-]?\s*(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})\s+(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?',
+      r'(?:as on|time|date|on|dated)?\s*[:#-]?\s*(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})\s+(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?',
       caseSensitive: false,
     );
     final match1 = timeWithDateRegex.firstMatch(text);
@@ -466,7 +525,7 @@ class ExpenseParser {
 
     // 2. Named month with time: DD-Mon-YYYY HH:mm:ss
     final namedMonthTimeRegex = RegExp(
-      r'(\d{1,2})-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*-(\d{2,4})\s+(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?',
+      r'(\d{1,2})[-/\.](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-/\.](\d{2,4})\s+(?:at\s+)?(\d{1,2}):(\d{2})(?::(\d{2}))?',
       caseSensitive: false,
     );
     final match2 = namedMonthTimeRegex.firstMatch(text);
@@ -483,16 +542,32 @@ class ExpenseParser {
       }
     }
 
-    // 3. Standalone date DD-MM-YYYY or DD/MM/YYYY after "on" or "date"
-    final dateRegex = RegExp(
-      r'(?:on|date|dated)\s*[:#-]?\s*(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})',
+    // 3. Named month date without time: DD-Mon-YYYY or DD-Mon-YY
+    final namedMonthDateRegex = RegExp(
+      r'(?:as on|on|date|dated)?\s*[:#-]?\s*(\d{1,2})[-/\.](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*[-/\.](\d{2,4})',
       caseSensitive: false,
     );
-    final match3 = dateRegex.firstMatch(text);
+    final match3 = namedMonthDateRegex.firstMatch(text);
     if (match3 != null) {
       int d = int.parse(match3.group(1)!);
-      int m = int.parse(match3.group(2)!);
+      int m = _parseMonth(match3.group(2)!);
       String yStr = match3.group(3)!;
+      int y = yStr.length == 2 ? 2000 + int.parse(yStr) : int.parse(yStr);
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        return DateTime(y, m, d);
+      }
+    }
+
+    // 4. Standalone date DD-MM-YYYY or DD/MM/YYYY after "as on", "on" or "date"
+    final dateRegex = RegExp(
+      r'(?:as on|on|date|dated)\s*[:#-]?\s*(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2,4})',
+      caseSensitive: false,
+    );
+    final match4 = dateRegex.firstMatch(text);
+    if (match4 != null) {
+      int d = int.parse(match4.group(1)!);
+      int m = int.parse(match4.group(2)!);
+      String yStr = match4.group(3)!;
       int y = yStr.length == 2 ? 2000 + int.parse(yStr) : int.parse(yStr);
       if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
         return DateTime(y, m, d);
@@ -521,6 +596,18 @@ class ExpenseParser {
     }
     if (lower.contains('axis')) {
       return 'Axis Bank';
+    }
+    if (lower.contains('canara bank') || lower.contains('canara')) {
+      return 'Canara Bank';
+    }
+    if (lower.contains('punjab national bank') || lower.contains('pnb')) {
+      return 'Punjab National Bank';
+    }
+    if (lower.contains('kotak mahindra') || lower.contains('kotak')) {
+      return 'Kotak Mahindra Bank';
+    }
+    if (lower.contains('union bank')) {
+      return 'Union Bank of India';
     }
     return null;
   }

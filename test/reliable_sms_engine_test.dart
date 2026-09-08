@@ -9,6 +9,8 @@ import 'package:expense_tracker/repositories/transaction_repository.dart';
 import 'package:expense_tracker/services/sms_account_resolver.dart';
 import 'package:expense_tracker/services/sms_transaction_importer.dart';
 import 'package:expense_tracker/models/pending_due.dart';
+import 'package:expense_tracker/models/sms_recognition_rule.dart';
+import 'package:expense_tracker/repositories/sms_rule_repository.dart';
 import 'package:expense_tracker/utils/expense_parser.dart';
 
 class FakeTransactionRepository implements TransactionRepository {
@@ -153,6 +155,7 @@ void main() {
     late FakeTransactionRepository txRepo;
     late FakeAccountRepository accRepo;
     late FakePendingDueRepository dueRepo;
+    late SmsRuleRepository ruleRepo;
     late SmsTransactionImporter importer;
     late SmsAccountResolver resolver;
 
@@ -160,10 +163,12 @@ void main() {
       txRepo = FakeTransactionRepository();
       accRepo = FakeAccountRepository();
       dueRepo = FakePendingDueRepository();
+      ruleRepo = SmsRuleRepository.inMemory();
       importer = SmsTransactionImporter(
         transactionRepo: txRepo,
         pendingDueRepo: dueRepo,
         accountRepo: accRepo,
+        ruleRepo: ruleRepo,
       );
       resolver = SmsAccountResolver();
     });
@@ -529,8 +534,21 @@ void main() {
         currentBalance: 300.00,
         balanceUpdatedAt: DateTime(2026, 9, 1, 9, 0),
         accentColor: Colors.green,
+        smsTrackingEnabled: true,
       );
       await accRepo.addAccount(acc);
+      await ruleRepo.addRule(SmsRecognitionRule(
+        id: 'rule_chrono',
+        accountId: 'acc_chrono',
+        ruleLabel: 'KGB Rule',
+        accountIdentifier: '544',
+        senderPatterns: ['VK-KGBANK', 'KGBANK'],
+        debitKeywords: const ['debited'],
+        creditKeywords: const ['credited'],
+        coversDebit: true,
+        coversCredit: true,
+        createdAt: DateTime.now(),
+      ));
 
       final conv = Conversation(
         id: 'VK-KGBANK',
@@ -585,16 +603,15 @@ void main() {
       );
 
       final result = await importer.importMessage(msg, 'UNKNOWN-BANK', resolver, dueRepo, []);
-      expect(result, SmsImportResult.imported);
+      // Under new rule: unconfigured account SMS is skipped, no account or tx created
+      expect(result, SmsImportResult.skipped);
 
       // Account repository must NOT have any new accounts created
       expect(accRepo.accounts.isEmpty, isTrue);
 
-      // Transaction is still preserved with accountId = null
+      // No transaction created without matching account
       final allTx = await txRepo.getTransactions();
-      expect(allTx.length, 1);
-      expect(allTx.first.amount, 150.0);
-      expect(allTx.first.accountId, isNull);
+      expect(allTx.isEmpty, isTrue);
     });
   });
 }

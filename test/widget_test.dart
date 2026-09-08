@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:expense_tracker/widgets/transaction_card.dart';
 import 'package:expense_tracker/models/transaction.dart';
 
@@ -23,5 +24,11 @@ void main() {
     expect(find.text('Test Merchant'), findsOneWidget);
     expect(find.textContaining('Food'), findsOneWidget);
     expect(find.textContaining('150'), findsOneWidget);
+  });
+
+  test('Check NumberFormat for negative values', () {
+    final f = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+    // ignore: avoid_print
+    print('NEGATIVE FORMAT: "${f.format(-500.0)}"');
   });
 }

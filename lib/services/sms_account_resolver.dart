@@ -1,3 +1,12 @@
+// ARCHITECTURE NOTE: SmsAccountResolver is NO LONGER used for SMS transaction
+// account matching. Its resolveAccount() and resolveAccountId() methods are
+// kept for use in BANK STATEMENT PARSING (BankStatementService) only.
+//
+// For SMS scanning, account matching is done by:
+//   SmsAccountIndex → AccountSmsMatcher → SmsRecognitionRule
+//
+// The resolver's static utility methods (normalizeBankIdentifier,
+// extractLast3Digits) remain available as shared utilities.
 import '../models/account.dart';
 import '../utils/expense_parser.dart';
 import 'bank_detection_service.dart';

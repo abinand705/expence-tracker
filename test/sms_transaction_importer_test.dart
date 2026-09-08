@@ -7,6 +7,9 @@ import 'package:expense_tracker/models/transaction.dart' as model_tx;
 import 'package:expense_tracker/repositories/pending_due_repository.dart';
 import 'package:expense_tracker/models/pending_due.dart';
 import 'package:expense_tracker/models/account.dart';
+import 'package:expense_tracker/repositories/account_repository.dart';
+import 'package:expense_tracker/models/sms_recognition_rule.dart';
+import 'package:expense_tracker/repositories/sms_rule_repository.dart';
 
 class MockTransactionRepository implements TransactionRepository {
   final Map<String, model_tx.Transaction> transactions = {};
@@ -59,16 +62,67 @@ class MockPendingDueRepository implements PendingDueRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class MockAccountRepository implements AccountRepository {
+  final Map<String, Account> accounts = {};
+
+  @override
+  Future<List<Account>> getAccounts() async => accounts.values.toList();
+
+  @override
+  Future<Account?> getAccountById(String id) async => accounts[id];
+
+  @override
+  Future<void> updateAccount(Account account) async {
+    accounts[account.id] = account;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   group('SmsTransactionImporter', () {
     late MockTransactionRepository repo;
     late MockPendingDueRepository dueRepo;
+    late MockAccountRepository accRepo;
+    late SmsRuleRepository ruleRepo;
     late SmsTransactionImporter importer;
 
     setUp(() {
       repo = MockTransactionRepository();
       dueRepo = MockPendingDueRepository();
-      importer = SmsTransactionImporter(transactionRepo: repo, pendingDueRepo: dueRepo);
+      accRepo = MockAccountRepository();
+      ruleRepo = SmsRuleRepository.inMemory();
+
+      final defaultAccount = Account(
+        id: 'acc_bank_a',
+        name: 'BankA Savings',
+        bankName: 'BankA',
+        accountNumber: '1234',
+        accountType: 'Savings',
+        accentColor: const Color(0xFF000000),
+        smsTrackingEnabled: true,
+      );
+      accRepo.accounts[defaultAccount.id] = defaultAccount;
+      ruleRepo.addRule(SmsRecognitionRule(
+        id: 'rule_bank_a',
+        accountId: defaultAccount.id,
+        ruleLabel: 'BankA Rule',
+        accountIdentifier: '', // matches any SMS from BankA
+        senderPatterns: ['BankA'],
+        debitKeywords: const ['debited'],
+        creditKeywords: const ['credited'],
+        coversDebit: true,
+        coversCredit: true,
+        createdAt: DateTime.now(),
+      ));
+
+      importer = SmsTransactionImporter(
+        transactionRepo: repo,
+        pendingDueRepo: dueRepo,
+        accountRepo: accRepo,
+        ruleRepo: ruleRepo,
+      );
     });
 
     test('imports valid expense sms', () async {
@@ -214,7 +268,7 @@ void main() {
       expect(savedDue.accountId, 'random_uid');
     });
 
-    test('TEST 4 - Ambiguous accounts leaves accountId null', () async {
+    test('TEST 4 - Ambiguous accounts leaves accountId null and skips SMS', () async {
       final msg = Message(
         id: 'canonical_4',
         text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
@@ -226,12 +280,10 @@ void main() {
         Account(id: 'acc2', name: 'HDFC2', bankName: 'HDFC', accountNumber: '1234', accountType: 'Current', accentColor: const Color(0xFF000000))
       ];
       final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
-      expect(result, SmsImportResult.imported);
-      final savedTx = repo.transactions.values.last;
-      expect(savedTx.accountId, isNull);
+      expect(result, SmsImportResult.skipped);
     });
 
-    test('TEST 5 - Different bank does not map and leaves accountId null', () async {
+    test('TEST 5 - Different bank does not map and skips SMS', () async {
       final msg = Message(
         id: 'canonical_5',
         text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
@@ -243,9 +295,7 @@ void main() {
       ];
       // Detected bank is HDFC based on sender, existing account is SBI
       final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
-      expect(result, SmsImportResult.imported);
-      final savedTx = repo.transactions.values.last;
-      expect(savedTx.accountId, isNull);
+      expect(result, SmsImportResult.skipped);
     });
 
     test('3-digit suffix maps to registered account', () async {
@@ -295,6 +345,64 @@ void main() {
       final savedDue = dueRepo.dues.values.last;
       expect(savedDue.accountId, 'bob_sip_acc');
       expect(savedDue.amount, 100.0);
+    });
+
+    test('Canara Bank bulk import resolves latest balance even when older messages exist', () async {
+      final canaraAccount = Account(
+        id: 'canara_acc',
+        name: 'Canara Savings',
+        bankName: 'Canara Bank',
+        accountNumber: '99991234',
+        accountType: 'Savings',
+        accentColor: const Color(0xFF005DAA),
+        smsTrackingEnabled: true,
+      );
+      accRepo.accounts['canara_acc'] = canaraAccount;
+      ruleRepo.addRule(SmsRecognitionRule(
+        id: 'canara_rule',
+        accountId: 'canara_acc',
+        ruleLabel: 'Canara Rule',
+        accountIdentifier: '1234',
+        senderPatterns: ['CANBNK', 'CANARA'],
+        debitKeywords: const ['debited'],
+        creditKeywords: const ['credited'],
+        coversDebit: true,
+        coversCredit: true,
+        createdAt: DateTime.now(),
+      ));
+
+      // Messages in reverse chronological order (or out-of-order)
+      final conv = Conversation(
+        id: 'conv_canara',
+        senderName: 'CANBNK',
+        senderNumber: 'CANBNK',
+        avatarColor: const Color(0xFF005DAA),
+        isBankSender: true,
+        messages: [
+          // Newer message
+          Message(
+            id: 'msg_new',
+            text: 'Canara Bank: Dear UPI user A/C XX1234 debited by 150.0 on date 08Sep26 trf to SWIGGY. Refno 123456789. Avl Bal Rs:14200.00',
+            timestamp: DateTime(2026, 9, 8, 12, 0),
+            isMe: false,
+          ),
+          // Older message with previous balance
+          Message(
+            id: 'msg_old',
+            text: 'Your A/C XX1234 debited by Rs 500 on 01-08-2026. Available Balance:Rs.5000.00 - Canara Bank',
+            timestamp: DateTime(2026, 8, 1, 10, 0),
+            isMe: false,
+          ),
+        ],
+      );
+
+      final summary = await importer.importAllBankMessages([conv]);
+      expect(summary.imported, 2);
+
+      final updatedAcc = accRepo.accounts['canara_acc']!;
+      expect(updatedAcc.currentBalance, 14200.00);
+      expect(updatedAcc.balanceUpdatedAt, isNotNull);
+      expect(updatedAcc.balanceUpdatedAt!.month, 9);
     });
   });
 }

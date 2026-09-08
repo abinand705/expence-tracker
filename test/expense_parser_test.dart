@@ -151,5 +151,60 @@ void main() {
         expect(result!.merchant, isNull);
       });
     });
+
+    group('Canara Bank & Indian Bank Balance & Date Tests', () {
+      test('extracts balance from Avl Bal Rs:14200.00', () {
+        const text = 'Canara Bank: Dear UPI user A/C XX1234 debited by 150.0 on date 08Sep26 trf to SWIGGY. Refno 123456789. If not you cancel in app. Avl Bal Rs:14200.00';
+        final parsed = ExpenseParser.parse(text);
+        expect(parsed, isNotNull);
+        expect(parsed!.amount, 150.0);
+        expect(parsed.availableBalance, 14200.0);
+        expect(parsed.accountNumber, '1234');
+        expect(parsed.bankName, 'Canara Bank');
+      });
+
+      test('extracts balance from Avl. Bal. : Rs. 12,345.50', () {
+        const text = 'Your A/C XXXXX1234 is debited by Rs.500.00 on 08-09-2026 14:30:15. Available Balance:Rs.12345.50 - Canara Bank';
+        final parsed = ExpenseParser.parse(text);
+        expect(parsed, isNotNull);
+        expect(parsed!.amount, 500.0);
+        expect(parsed.availableBalance, 12345.50);
+        expect(parsed.bankName, 'Canara Bank');
+      });
+
+      test('extracts balance from as on pattern', () {
+        const text = 'Canara Bank: Avl. Bal. for A/c ...1234 as on 08/09/2026 is Rs. 18,450.00';
+        final bal = ExpenseParser.extractBalance(text);
+        expect(bal, 18450.0);
+        final ts = ExpenseParser.extractTransactionTimestamp(text);
+        expect(ts, isNotNull);
+        expect(ts!.year, 2026);
+        expect(ts.month, 9);
+        expect(ts.day, 8);
+      });
+
+      test('extracts named month date without time', () {
+        const text = 'Dear Customer, your a/c 1234 credited with Rs 5000 on 08-Sep-2026. Avl Bal Rs: 25000.00';
+        final ts = ExpenseParser.extractTransactionTimestamp(text);
+        expect(ts, isNotNull);
+        expect(ts!.year, 2026);
+        expect(ts.month, 9);
+        expect(ts.day, 8);
+      });
+
+      test('extracts negative balance with minus signs', () {
+        expect(ExpenseParser.extractBalance('Avl Bal Rs: -500.00'), -500.0);
+        expect(ExpenseParser.extractBalance('Avl Bal: -Rs 500.00'), -500.0);
+        expect(ExpenseParser.extractBalance('Bal: -12,345.50'), -12345.50);
+        expect(ExpenseParser.extractBalance('Avl Bal: -₹ 750.25'), -750.25);
+      });
+
+      test('extracts negative balance with Dr/debit suffix', () {
+        expect(ExpenseParser.extractBalance('Avl Bal Rs: 500.00 Dr'), -500.0);
+        expect(ExpenseParser.extractBalance('Avl Bal: Rs 500.00 (Dr)'), -500.0);
+        expect(ExpenseParser.extractBalance('Avl Bal: Rs 500.00 Dr.'), -500.0);
+        expect(ExpenseParser.extractBalance('Available Balance: Rs. 1,200.00 debit'), -1200.0);
+      });
+    });
   });
 }
