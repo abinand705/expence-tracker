@@ -123,7 +123,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
       final apiKey = dotenv.env['FORMCONNECT_API_KEY'] ??
           const String.fromEnvironment('FORMCONNECT_API_KEY', defaultValue: 'fc_live_09a08edc9b883d8dcf9735c5a71d2099');
       final apiUrl = dotenv.env['FORMCONNECT_API_URL'] ??
-          const String.fromEnvironment('FORMCONNECT_API_URL', defaultValue: 'https://formconnect.onrender.com');
+          const String.fromEnvironment('FORMCONNECT_API_URL', defaultValue: 'https://formconnect.vercel.com');
 
       final uri = Uri.parse('$apiUrl/api/submit');
 
