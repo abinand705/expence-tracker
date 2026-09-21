@@ -52,7 +52,26 @@ class TransactionRepository {
   }
 
   Stream<List<model.Transaction>> watchTransactions() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      debugPrint('[REPOSITORY] watchTransactions: User is not authenticated initially, waiting for authStateChanges');
+      return _auth.authStateChanges().asyncExpand((u) {
+        if (u == null) return Stream.value([]);
+        return _firestore
+            .collection('users')
+            .doc(u.uid)
+            .collection('transactions')
+            .orderBy('date', descending: true)
+            .snapshots()
+            .map((snapshot) {
+              debugPrint('[REPOSITORY] Transactions read: ${snapshot.docs.length}');
+              return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
+            });
+      });
+    }
+
     return _transactionsRef.orderBy('date', descending: true).snapshots().map((snapshot) {
+      debugPrint('[REPOSITORY] Transactions read: ${snapshot.docs.length}');
       return snapshot.docs.map((doc) => model.Transaction.fromMap(doc.data())).toList();
     });
   }
@@ -64,32 +83,44 @@ class TransactionRepository {
   }
 
   Future<String> addTransaction(model.Transaction transaction) async {
-    final docRef = _transactionsRef.doc(transaction.id);
-    
-    final data = transaction.toMap();
-    data['createdAt'] = FieldValue.serverTimestamp();
-    data['updatedAt'] = FieldValue.serverTimestamp();
-    
-    await docRef.set(data);
-    return docRef.id;
-  }
-
-  Future<bool> addTransactionIfAbsent(model.Transaction transaction) async {
-    final docRef = _transactionsRef.doc(transaction.id);
-    
-    return await _firestore.runTransaction((tx) async {
-      final doc = await tx.get(docRef);
-      if (doc.exists) {
-        return false;
-      }
+    try {
+      final docRef = _transactionsRef.doc(transaction.id);
       
       final data = transaction.toMap();
       data['createdAt'] = FieldValue.serverTimestamp();
       data['updatedAt'] = FieldValue.serverTimestamp();
       
-      tx.set(docRef, data);
-      return true;
-    });
+      await docRef.set(data);
+      debugPrint('[REPOSITORY] Transactions written: 1 (id: ${transaction.id})');
+      return docRef.id;
+    } catch (e) {
+      debugPrint('[REPOSITORY] Transaction write failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> addTransactionIfAbsent(model.Transaction transaction) async {
+    try {
+      final docRef = _transactionsRef.doc(transaction.id);
+      
+      return await _firestore.runTransaction((tx) async {
+        final doc = await tx.get(docRef);
+        if (doc.exists) {
+          return false;
+        }
+        
+        final data = transaction.toMap();
+        data['createdAt'] = FieldValue.serverTimestamp();
+        data['updatedAt'] = FieldValue.serverTimestamp();
+        
+        tx.set(docRef, data);
+        debugPrint('[REPOSITORY] Transactions written: 1 (id: ${transaction.id})');
+        return true;
+      });
+    } catch (e) {
+      debugPrint('[REPOSITORY] Transaction write failed: $e');
+      rethrow;
+    }
   }
 
   Future<void> batchAddTransactions(List<model.Transaction> transactions) async {

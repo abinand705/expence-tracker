@@ -23,23 +23,40 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   
   List<Transaction> _allTransactions = [];
   bool _isLoading = true;
+  bool _hasError = false;
   StreamSubscription<List<Transaction>>? _transactionSubscription;
 
   @override
   void initState() {
     super.initState();
+    _startListening();
+  }
+
+  void _startListening() {
+    _transactionSubscription?.cancel();
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+
     _transactionSubscription = _transactionRepo.watchTransactions().listen(
       (transactions) {
+        debugPrint('[TRANSACTION_PAGE] Transactions received: ${transactions.length}');
         if (mounted) {
           setState(() {
             _allTransactions = transactions;
             _isLoading = false;
+            _hasError = false;
           });
         }
       },
       onError: (e) {
+        debugPrint('[TRANSACTION_PAGE] Error loading transactions: $e');
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+          });
         }
       },
     );
@@ -135,20 +152,65 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
           ),
           Expanded(
             child: _isLoading
-              ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primaryContainer))
-              : filteredTransactions.isEmpty
-                  ? const Center(child: Text("No transactions found"))
-                  : RefreshIndicator(
-                      onRefresh: _loadTransactions,
-                      color: Theme.of(context).colorScheme.primaryContainer,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
-                        itemCount: filteredTransactions.length,
-                        itemBuilder: (context, index) {
-                          return TransactionCard(transaction: filteredTransactions[index]);
-                        },
-                      ),
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: AppSpacing.md),
+                        Text(
+                          'Loading transactions...',
+                          style: AppTypography.bodyMd.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
+                      ],
                     ),
+                  )
+                : _hasError
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Unable to load transactions',
+                              style: AppTypography.headlineMd.copyWith(color: Theme.of(context).colorScheme.onSurface),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            FilledButton.tonal(
+                              onPressed: _startListening,
+                              child: const Text('Try again'),
+                            ),
+                          ],
+                        ),
+                      )
+                    : filteredTransactions.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.receipt_long_outlined, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant.withAlpha(120)),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  _searchQuery.isNotEmpty || _selectedFilter != 'All'
+                                      ? 'No transactions found'
+                                      : 'No transactions yet',
+                                  style: AppTypography.bodyLg.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          )
+                        : RefreshIndicator(
+                            onRefresh: _loadTransactions,
+                            color: Theme.of(context).colorScheme.primary,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.containerMargin),
+                              itemCount: filteredTransactions.length,
+                              itemBuilder: (context, index) {
+                                return TransactionCard(transaction: filteredTransactions[index]);
+                              },
+                            ),
+                          ),
           ),
         ],
       ),

@@ -603,15 +603,16 @@ void main() {
       );
 
       final result = await importer.importMessage(msg, 'UNKNOWN-BANK', resolver, dueRepo, []);
-      // Under new rule: unconfigured account SMS is skipped, no account or tx created
-      expect(result, SmsImportResult.skipped);
+      // Unconfigured account SMS is imported with accountId = null without creating accounts
+      expect(result, SmsImportResult.imported);
 
       // Account repository must NOT have any new accounts created
       expect(accRepo.accounts.isEmpty, isTrue);
 
-      // No transaction created without matching account
+      // Transaction created with null accountId
       final allTx = await txRepo.getTransactions();
-      expect(allTx.isEmpty, isTrue);
+      expect(allTx.length, 1);
+      expect(allTx.first.accountId, isNull);
     });
   });
 }

@@ -268,7 +268,7 @@ void main() {
       expect(savedDue.accountId, 'random_uid');
     });
 
-    test('TEST 4 - Ambiguous accounts leaves accountId null and skips SMS', () async {
+    test('TEST 4 - Ambiguous accounts leaves accountId null and imports SMS', () async {
       final msg = Message(
         id: 'canonical_4',
         text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
@@ -280,10 +280,12 @@ void main() {
         Account(id: 'acc2', name: 'HDFC2', bankName: 'HDFC', accountNumber: '1234', accountType: 'Current', accentColor: const Color(0xFF000000))
       ];
       final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
-      expect(result, SmsImportResult.skipped);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      expect(savedTx.accountId, isNull);
     });
 
-    test('TEST 5 - Different bank does not map and skips SMS', () async {
+    test('TEST 5 - Different bank leaves accountId null and imports SMS', () async {
       final msg = Message(
         id: 'canonical_5',
         text: 'Rs. 500 debited from a/c 1234 on 01-01-2026',
@@ -295,7 +297,9 @@ void main() {
       ];
       // Detected bank is HDFC based on sender, existing account is SBI
       final result = await importer.importMessage(msg, 'HDFC Bank', null, null, accounts);
-      expect(result, SmsImportResult.skipped);
+      expect(result, SmsImportResult.imported);
+      final savedTx = repo.transactions.values.last;
+      expect(savedTx.accountId, isNull);
     });
 
     test('3-digit suffix maps to registered account', () async {

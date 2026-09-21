@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_typography.dart';
+import '../../utils/feature_flags.dart';
 
 class BalanceCard extends StatelessWidget {
   final double totalBalance;
@@ -51,12 +52,20 @@ class BalanceCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            displayStr,
-            style: AppTypography.displayCurrency.copyWith(
-              color: isNegative ? AppColors.errorRed : cs.onSurface,
+          if (FeatureFlags.enableTotalBalance)
+            Text(
+              displayStr,
+              style: AppTypography.displayCurrency.copyWith(
+                color: isNegative ? AppColors.errorRed : cs.onSurface,
+              ),
+            )
+          else
+            Text(
+              'Currently unavailable',
+              style: AppTypography.headlineMd.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
             ),
-          ),
         ],
       ),
     );

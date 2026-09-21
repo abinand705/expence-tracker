@@ -51,7 +51,7 @@ class ExpenseParser {
   );
   
   static final RegExp _creditKeywords = RegExp(
-    r'(?:credited|credit\s+of|credit|received|deposit(?:ed)?|refund|cashback|salary\s+credited|amount\s+received|\bcr\b|cr\.)', 
+    r'(?:credited|credit\s+of|credit|received|deposit(?:ed)?|refund|cashback|salary\s+credited|amount\s+received|reversed|reversal|chargeback|\bcr\b|cr\.)', 
     caseSensitive: false
   );
   

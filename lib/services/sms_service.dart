@@ -9,6 +9,8 @@ import 'package:flutter_sms_inbox/flutter_sms_inbox.dart' as inbox;
 import '../utils/expense_parser.dart';
 import '../repositories/transaction_repository.dart';
 import '../services/sms_transaction_importer.dart';
+import '../repositories/account_discovery_repository.dart';
+import '../services/bank_account_discovery_service.dart';
 
 
 
@@ -255,6 +257,7 @@ class SmsService extends ChangeNotifier {
         sort: true,
       );
       
+      debugPrint('[SMS] Messages read: ${messages.length}');
       debugPrint('[SmsService] device SMS loaded: ${messages.length} messages');
 
       final Map<String, List<Message>> convMap = {};
@@ -283,7 +286,6 @@ class SmsService extends ChangeNotifier {
       int colorIndex = 0;
       
       final Map<String, List<Message>> allBankMessages = {};
-      int excludedFinancialCount = 0;
       
       for (var entry in convMap.entries) {
         final address = entry.key;
@@ -309,24 +311,12 @@ class SmsService extends ChangeNotifier {
           isBankSender: isFinancialMessage,
         );
 
-        if (isBank) {
+        if (isFinancialMessage) {
           final latestMsg = conv.latestMessage;
           if (latestMsg != null) {
             conv.latestParsedExpense = ExpenseParser.parse(latestMsg.text);
           }
           allBankMessages[address] = msgs;
-        } else {
-          // Diagnostic: check if this conversation contains financial messages despite not matching isBank
-          bool hasFinancial = false;
-          for (final msg in msgs) {
-            if (ExpenseParser.parse(msg.text) != null) {
-              hasFinancial = true;
-              excludedFinancialCount++;
-            }
-          }
-          if (hasFinancial) {
-            debugPrint('[SmsService] excluded financial-looking sender: $address');
-          }
         }
 
         _conversations.add(conv);
@@ -338,8 +328,14 @@ class SmsService extends ChangeNotifier {
       
       if (allBankMessages.isNotEmpty) {
         int totalBankMessages = allBankMessages.values.fold(0, (sum, msgs) => sum + msgs.length);
-        debugPrint('[SmsService] financial messages selected: $totalBankMessages');
-        debugPrint('[SmsService] excluded financial-looking messages: $excludedFinancialCount');
+        debugPrint('[PARSER] Financial messages detected: $totalBankMessages');
+        int parsedCount = 0;
+        for (final msgs in allBankMessages.values) {
+          for (final m in msgs) {
+            if (ExpenseParser.parse(m.text) != null) parsedCount++;
+          }
+        }
+        debugPrint('[PARSER] Transactions parsed: $parsedCount');
         try {
           final repo = TransactionRepository();
           final importer = SmsTransactionImporter(transactionRepo: repo);
@@ -347,6 +343,21 @@ class SmsService extends ChangeNotifier {
           debugPrint('[SmsService] transaction import and balance sync completed: $_lastImportSummary');
         } catch (e) {
           debugPrint('[SmsService] bank import failed: $e');
+        }
+
+        // Automatic Bank Account Discovery (suggests accounts without auto-creating)
+        try {
+          final discoveryService = BankAccountDiscoveryService();
+          final discoveries = await discoveryService.discoverAccounts(
+            conversations: _conversations,
+          );
+          final discoveryRepo = AccountDiscoveryRepository();
+          for (final d in discoveries) {
+            await discoveryRepo.saveDiscovery(d);
+          }
+          debugPrint('[SmsService] account discovery completed: ${discoveries.length} candidates found');
+        } catch (e) {
+          debugPrint('[SmsService] account discovery failed: $e');
         }
       }
       

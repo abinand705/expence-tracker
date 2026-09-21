@@ -4,6 +4,8 @@ import 'theme/theme_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'screens/auth_wrapper.dart';
 import 'services/notification_service.dart';
 
@@ -20,6 +22,14 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  try {
+    await FirebaseAppCheck.instance.activate(
+      providerAndroid: kDebugMode ? AndroidDebugProvider() : AndroidPlayIntegrityProvider(),
+      providerApple: kDebugMode ? AppleDebugProvider() : AppleDeviceCheckProvider(),
+    );
+  } catch (e) {
+    debugPrint("FirebaseAppCheck initialization warning: $e");
+  }
   runApp(const MoneyTrackApp());
 }
 

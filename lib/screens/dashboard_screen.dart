@@ -24,6 +24,7 @@ import '../widgets/dashboard/spending_trend_card.dart';
 import '../widgets/dashboard/spend_categories_card.dart';
 import 'budget_settings_screen.dart';
 import '../services/notification_service.dart';
+import '../utils/feature_flags.dart';
 
 class DashboardScreen extends StatefulWidget {
   final VoidCallback? onSeeAllClicked;
@@ -95,7 +96,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (accounts) {
         if (mounted) {
           setState(() {
-            _totalBalance = accounts.fold(0.0, (sum, acc) => sum + acc.currentBalance);
+            if (FeatureFlags.enableTotalBalance) {
+              _totalBalance = accounts.fold(0.0, (sum, acc) => sum + acc.currentBalance);
+            }
           });
         }
       },

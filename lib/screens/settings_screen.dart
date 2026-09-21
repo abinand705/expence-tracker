@@ -14,6 +14,8 @@ import 'help_support_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../repositories/user_repository.dart';
 import '../widgets/settings/notification_setting_tile.dart';
+import '../services/gemini_config_service.dart';
+import 'duplicate_review_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -33,6 +35,7 @@ class SettingsScreen extends StatelessWidget {
           const NotificationSettingTile(),
           _buildSettingsTile(context, Icons.security, 'Biometric Lock', trailing: Switch(value: false, onChanged: (v) {})),
           const _ExpenseCycleSetting(),
+          const _AiTransactionSetting(),
           _buildSettingsTile(
             context,
             Icons.account_balance_wallet, 
@@ -497,5 +500,99 @@ class _ExpenseCycleSettingState extends State<_ExpenseCycleSetting> {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI Transaction Intelligence Setting
+// ─────────────────────────────────────────────────────────────────────────────
+class _AiTransactionSetting extends StatelessWidget {
+  const _AiTransactionSetting();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final geminiService = GeminiConfigService();
+
+    return ListenableBuilder(
+      listenable: geminiService,
+      builder: (context, _) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            boxShadow: AppShadows.level1,
+          ),
+          child: Column(
+            children: [
+              SwitchListTile(
+                value: geminiService.isEnabled,
+                onChanged: (val) => geminiService.setEnabled(val),
+                activeThumbColor: cs.primaryContainer,
+                secondary: Icon(Icons.auto_awesome, color: cs.primaryContainer),
+                title: Text('AI Transaction Intelligence', style: AppTypography.bodyLg),
+                subtitle: Text(
+                  'Uses Gemini to identify when multiple bank messages belong to the same transaction and improve transaction categorization.',
+                  style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+              ),
+              if (geminiService.isEnabled) ...[
+                const Divider(height: 1),
+                ListTile(
+                  dense: true,
+                  leading: Icon(Icons.rate_review_outlined, color: cs.outline, size: 20),
+                  title: Text('Needs Review', style: AppTypography.bodyMd),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (geminiService.pendingReviewCount > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorRed,
+                            borderRadius: BorderRadius.circular(AppRadius.full),
+                          ),
+                          child: Text(
+                            '${geminiService.pendingReviewCount}',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.chevron_right, color: cs.outline, size: 20),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DuplicateReviewScreen()),
+                    );
+                  },
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'AI-assisted: ${geminiService.aiAssistedCount}',
+                        style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                      Text(
+                        'AI decisions: ${geminiService.aiDecisionsCount}',
+                        style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 
 

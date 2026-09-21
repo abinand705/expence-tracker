@@ -12,6 +12,11 @@ import 'import_statement_preview_screen.dart';
 import 'account_create_screen.dart';
 import 'account_sms_config_screen.dart';
 import '../services/sms_service.dart';
+import '../utils/feature_flags.dart';
+import '../models/discovered_bank_account.dart';
+import '../repositories/account_discovery_repository.dart';
+import '../services/bank_account_discovery_service.dart';
+import '../widgets/account_discovery_sheet.dart';
 
 class MyAccountsScreen extends StatefulWidget {
   const MyAccountsScreen({super.key});
@@ -23,11 +28,15 @@ class MyAccountsScreen extends StatefulWidget {
 class _MyAccountsScreenState extends State<MyAccountsScreen> {
   final AccountRepository _accountRepo = AccountRepository();
   final SmsRuleRepository _ruleRepo = SmsRuleRepository();
+  final AccountDiscoveryRepository _discoveryRepo = AccountDiscoveryRepository();
 
   List<Account> _accounts = [];
+  List<DiscoveredBankAccount> _pendingDiscoveries = [];
 
   bool _isLoading = true;
+  bool _isScanningAccounts = false;
   StreamSubscription<List<Account>>? _accountSubscription;
+  StreamSubscription<List<DiscoveredBankAccount>>? _discoverySubscription;
 
   // Cache: accountId → rule count
   final Map<String, int> _ruleCountCache = {};
@@ -49,6 +58,14 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         if (mounted) setState(() => _isLoading = false);
       },
     );
+
+    _discoverySubscription = _discoveryRepo.watchPendingDiscoveries().listen(
+      (discoveries) {
+        if (mounted) {
+          setState(() => _pendingDiscoveries = discoveries);
+        }
+      },
+    );
   }
 
   Future<void> _loadRuleCounts([List<Account>? accounts]) async {
@@ -66,7 +83,54 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   @override
   void dispose() {
     _accountSubscription?.cancel();
+    _discoverySubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _scanMessagesForAccounts() async {
+    setState(() => _isScanningAccounts = true);
+    try {
+      final smsService = SmsService();
+      await smsService.ensureLoaded();
+
+      final discoveryService = BankAccountDiscoveryService(
+        discoveryRepo: _discoveryRepo,
+        accountRepo: _accountRepo,
+      );
+
+      final discoveries = await discoveryService.discoverAccounts(
+        conversations: smsService.conversations,
+        existingAccounts: _accounts,
+      );
+
+      for (final d in discoveries) {
+        await _discoveryRepo.saveDiscovery(d);
+      }
+
+      if (mounted) {
+        if (discoveries.isNotEmpty) {
+          await showAccountDiscoveryDialog(
+            context: context,
+            discoveries: discoveries,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No new bank accounts found in messages.'),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[MyAccountsScreen] scan error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error scanning messages: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isScanningAccounts = false);
+    }
   }
 
   Future<void> _refreshAccounts() async {
@@ -90,7 +154,9 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       );
     }
 
-    final totalNetWorth = _accounts.fold(0.0, (sum, acc) => sum + acc.currentBalance);
+    final totalNetWorth = FeatureFlags.enableTotalBalance
+        ? _accounts.fold(0.0, (sum, acc) => sum + acc.currentBalance)
+        : 0.0;
     final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
 
     return Scaffold(
@@ -101,6 +167,13 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         ),
         title: Text('My Accounts', style: AppTypography.headlineMd),
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.auto_awesome),
+            tooltip: 'Scan Messages for Accounts',
+            onPressed: _isScanningAccounts ? null : _scanMessagesForAccounts,
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshAccounts,
@@ -111,6 +184,10 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildNetWorthCard(context, currencyFormatter, totalNetWorth),
+              if (_pendingDiscoveries.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.lg),
+                _buildPotentialAccountsSection(context, cs),
+              ],
               const SizedBox(height: AppSpacing.lg),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -227,12 +304,20 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
             style: AppTypography.labelCaps.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            _formatCurrency(totalNetWorth),
-            style: AppTypography.displayCurrency.copyWith(
-                color: totalNetWorth < 0 ? AppColors.errorRed : cs.primary, 
-                fontWeight: FontWeight.bold),
-          ),
+          if (FeatureFlags.enableTotalBalance)
+            Text(
+              _formatCurrency(totalNetWorth),
+              style: AppTypography.displayCurrency.copyWith(
+                  color: totalNetWorth < 0 ? AppColors.errorRed : cs.primary, 
+                  fontWeight: FontWeight.bold),
+            )
+          else
+            Text(
+              'Currently unavailable',
+              style: AppTypography.headlineMd.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
           const SizedBox(height: AppSpacing.lg),
           Row(
             children: [
@@ -275,6 +360,181 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
               ),
             ],
           ),
+          const SizedBox(height: AppSpacing.sm),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _isScanningAccounts ? null : _scanMessagesForAccounts,
+              icon: _isScanningAccounts
+                  ? SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.primary,
+                      ),
+                    )
+                  : Icon(Icons.auto_awesome, color: cs.primary, size: 16),
+              label: Text(
+                _isScanningAccounts ? 'Scanning Messages...' : 'Scan Messages for Accounts',
+                style: AppTypography.labelCaps.copyWith(
+                  color: cs.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                side: BorderSide(color: cs.primary.withAlpha(120)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPotentialAccountsSection(BuildContext context, ColorScheme cs) {
+    final currencyFormatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer.withAlpha(25),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.primary.withAlpha(60)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome, color: cs.primary, size: 18),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'Potential Accounts',
+                style: AppTypography.headlineMd.copyWith(
+                  color: cs.onSurface,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: cs.primary.withAlpha(40),
+                  borderRadius: BorderRadius.circular(AppRadius.full),
+                ),
+                child: Text(
+                  '${_pendingDiscoveries.length} found',
+                  style: AppTypography.labelMuted.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'MoneyTrack found bank accounts in your messages. Confirm to initialize tracking.',
+            style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant, fontSize: 12),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ..._pendingDiscoveries.map((discovery) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: AppShadows.level1,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withAlpha(30),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(Icons.account_balance, color: cs.primary),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              discovery.bankName,
+                              style: AppTypography.bodyLg.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurface,
+                              ),
+                            ),
+                            Text(
+                              'Account: ${discovery.maskedAccountNumber} • ${discovery.accountType}',
+                              style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            if (discovery.detectedBalance != null)
+                              Text(
+                                'Latest balance: ${currencyFormatter.format(discovery.detectedBalance)}*',
+                                style: AppTypography.labelMuted.copyWith(
+                                  color: AppColors.successGreen,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            Text(
+                              '${discovery.messageCount} messages detected',
+                              style: AppTypography.labelMuted.copyWith(
+                                fontSize: 10,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => _discoveryRepo.ignoreDiscovery(discovery.discoveryId),
+                        child: Text('Ignore', style: TextStyle(color: cs.error, fontSize: 12)),
+                      ),
+                      TextButton(
+                        onPressed: () => _discoveryRepo.dismissDiscovery(discovery.discoveryId),
+                        child: Text('Not Now', style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      ElevatedButton(
+                        onPressed: () {
+                          showAccountDiscoveryDialog(
+                            context: context,
+                            discoveries: [discovery],
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: cs.primary,
+                          foregroundColor: cs.onPrimary,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Set Up'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
