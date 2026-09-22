@@ -9,6 +9,7 @@ import '../services/sms_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../utils/dropdown_safety.dart';
 
 /// Multi-step account creation wizard.
 ///
@@ -615,16 +616,23 @@ class _AccountCreateScreenState extends State<AccountCreateScreen> {
 
           // Rule Label
           _buildFieldLabel('Rule Type'),
-          DropdownButtonFormField<String>(
-            initialValue: _ruleLabelCtrl,
-            decoration: _inputDecoration(null),
-            items: ['Debit', 'Credit', 'UPI Debit', 'UPI Credit', 'Other']
-                .map((l) => DropdownMenuItem(value: l, child: Text(l)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _ruleLabelCtrl = v);
-            },
-          ),
+          Builder(builder: (context) {
+            final resolved = DropdownSafety.resolve(
+              items: ['Debit', 'Credit', 'UPI Debit', 'UPI Credit', 'ATM', 'Other', if (_ruleLabelCtrl.isNotEmpty) _ruleLabelCtrl],
+              currentValue: _ruleLabelCtrl,
+              fallback: 'Debit',
+            );
+            return DropdownButtonFormField<String>(
+              initialValue: resolved.safeValue,
+              decoration: _inputDecoration(null),
+              items: resolved.items
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _ruleLabelCtrl = v);
+              },
+            );
+          }),
           const SizedBox(height: AppSpacing.md),
 
           // Sender

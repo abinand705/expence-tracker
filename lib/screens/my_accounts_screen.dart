@@ -15,20 +15,30 @@ import '../services/sms_service.dart';
 import '../utils/feature_flags.dart';
 import '../models/discovered_bank_account.dart';
 import '../repositories/account_discovery_repository.dart';
-import '../services/bank_account_discovery_service.dart';
+import '../services/account_pattern_discovery_service.dart';
 import '../widgets/account_discovery_sheet.dart';
+import '../widgets/account_pattern_review_sheet.dart';
 
 class MyAccountsScreen extends StatefulWidget {
-  const MyAccountsScreen({super.key});
+  final AccountRepository? accountRepository;
+  final SmsRuleRepository? ruleRepository;
+  final AccountDiscoveryRepository? discoveryRepository;
+
+  const MyAccountsScreen({
+    super.key,
+    this.accountRepository,
+    this.ruleRepository,
+    this.discoveryRepository,
+  });
 
   @override
   State<MyAccountsScreen> createState() => _MyAccountsScreenState();
 }
 
 class _MyAccountsScreenState extends State<MyAccountsScreen> {
-  final AccountRepository _accountRepo = AccountRepository();
-  final SmsRuleRepository _ruleRepo = SmsRuleRepository();
-  final AccountDiscoveryRepository _discoveryRepo = AccountDiscoveryRepository();
+  late final AccountRepository _accountRepo;
+  late final SmsRuleRepository _ruleRepo;
+  late final AccountDiscoveryRepository _discoveryRepo;
 
   List<Account> _accounts = [];
   List<DiscoveredBankAccount> _pendingDiscoveries = [];
@@ -44,6 +54,9 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
   @override
   void initState() {
     super.initState();
+    _accountRepo = widget.accountRepository ?? AccountRepository();
+    _ruleRepo = widget.ruleRepository ?? SmsRuleRepository();
+    _discoveryRepo = widget.discoveryRepository ?? AccountDiscoveryRepository();
     _accountSubscription = _accountRepo.watchAccounts().listen(
       (accounts) {
         if (mounted) {
@@ -93,30 +106,53 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       final smsService = SmsService();
       await smsService.ensureLoaded();
 
-      final discoveryService = BankAccountDiscoveryService(
+      final patternService = AccountPatternDiscoveryService(
         discoveryRepo: _discoveryRepo,
         accountRepo: _accountRepo,
+        ruleRepo: _ruleRepo,
       );
 
-      final discoveries = await discoveryService.discoverAccounts(
+      final result = await patternService.scanMessagesForPatterns(
         conversations: smsService.conversations,
         existingAccounts: _accounts,
       );
 
-      for (final d in discoveries) {
+      // Save any newly discovered brand-new bank accounts
+      for (final d in result.newlyDiscoveredAccounts) {
         await _discoveryRepo.saveDiscovery(d);
       }
 
       if (mounted) {
-        if (discoveries.isNotEmpty) {
+        if (result.recommendations.isNotEmpty) {
+          await showAccountPatternReviewSheet(
+            context: context,
+            recommendations: result.recommendations,
+            accounts: _accounts,
+            onApprove: (approved) async {
+              await patternService.applyApprovedPatterns(
+                approvedPatterns: approved,
+                accounts: _accounts,
+              );
+              await _loadRuleCounts(_accounts);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('SMS recognition rules updated.'),
+                    backgroundColor: AppColors.successGreen,
+                  ),
+                );
+              }
+            },
+          );
+        } else if (result.newlyDiscoveredAccounts.isNotEmpty) {
           await showAccountDiscoveryDialog(
             context: context,
-            discoveries: discoveries,
+            discoveries: result.newlyDiscoveredAccounts,
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('No new bank accounts found in messages.'),
+              content: Text('No new account patterns found.'),
             ),
           );
         }
@@ -125,7 +161,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       debugPrint('[MyAccountsScreen] scan error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error scanning messages: $e')),
+          const SnackBar(content: Text('Unable to scan messages. Please try again.')),
         );
       }
     } finally {
@@ -167,13 +203,6 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
         ),
         title: Text('My Accounts', style: AppTypography.headlineMd),
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_awesome),
-            tooltip: 'Scan Messages for Accounts',
-            onPressed: _isScanningAccounts ? null : _scanMessagesForAccounts,
-          ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshAccounts,
@@ -374,7 +403,7 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
                         color: cs.primary,
                       ),
                     )
-                  : Icon(Icons.auto_awesome, color: cs.primary, size: 16),
+                  : Icon(Icons.document_scanner, color: cs.primary, size: 16),
               label: Text(
                 _isScanningAccounts ? 'Scanning Messages...' : 'Scan Messages for Accounts',
                 style: AppTypography.labelCaps.copyWith(

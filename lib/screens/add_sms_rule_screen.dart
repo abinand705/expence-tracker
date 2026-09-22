@@ -7,6 +7,7 @@ import '../services/sms_rule_builder.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
+import '../utils/dropdown_safety.dart';
 
 /// Screen for adding or editing an SMS recognition rule.
 ///
@@ -59,7 +60,7 @@ class _AddSmsRuleScreenState extends State<AddSmsRuleScreen> {
       _senderCtrl.text = rule.senderPatterns.join(', ');
       _sampleSmsCtrl.text = rule.sampleSms ?? '';
       _accountIdCtrl.text = rule.accountIdentifier;
-      _ruleLabel = rule.ruleLabel;
+      _ruleLabel = DropdownSafety.normalizeRuleLabel(rule.ruleLabel);
       _txType = rule.coversDebit ? TransactionType.expense : TransactionType.income;
       _step = 1; // Go straight to review for edits
     } else {
@@ -214,16 +215,23 @@ class _AddSmsRuleScreenState extends State<AddSmsRuleScreen> {
           const SizedBox(height: AppSpacing.lg),
 
           _label('Rule Type'),
-          DropdownButtonFormField<String>(
-            initialValue: _ruleLabel,
-            decoration: _dec(null),
-            items: ['Debit', 'Credit', 'UPI Debit', 'UPI Credit', 'ATM', 'Other']
-                .map((l) => DropdownMenuItem(value: l, child: Text(l)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _ruleLabel = v);
-            },
-          ),
+          Builder(builder: (context) {
+            final resolved = DropdownSafety.resolve(
+              items: ['Debit', 'Credit', 'UPI Debit', 'UPI Credit', 'ATM', 'Other', if (_ruleLabel.isNotEmpty) _ruleLabel],
+              currentValue: _ruleLabel,
+              fallback: 'Debit',
+            );
+            return DropdownButtonFormField<String>(
+              initialValue: resolved.safeValue,
+              decoration: _dec(null),
+              items: resolved.items
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _ruleLabel = v);
+              },
+            );
+          }),
           const SizedBox(height: AppSpacing.md),
 
           _label('Sender Pattern(s) *'),
@@ -312,16 +320,23 @@ class _AddSmsRuleScreenState extends State<AddSmsRuleScreen> {
 
           // Editable fields
           _label('Rule Type'),
-          DropdownButtonFormField<String>(
-            initialValue: _ruleLabel,
-            decoration: _dec(null),
-            items: ['Debit', 'Credit', 'UPI Debit', 'UPI Credit', 'ATM', 'Other']
-                .map((l) => DropdownMenuItem(value: l, child: Text(l)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _ruleLabel = v);
-            },
-          ),
+          Builder(builder: (context) {
+            final resolved = DropdownSafety.resolve(
+              items: ['Debit', 'Credit', 'UPI Debit', 'UPI Credit', 'ATM', 'Other', if (_ruleLabel.isNotEmpty) _ruleLabel],
+              currentValue: _ruleLabel,
+              fallback: 'Debit',
+            );
+            return DropdownButtonFormField<String>(
+              initialValue: resolved.safeValue,
+              decoration: _dec(null),
+              items: resolved.items
+                  .map((l) => DropdownMenuItem(value: l, child: Text(l)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _ruleLabel = v);
+              },
+            );
+          }),
           const SizedBox(height: AppSpacing.md),
 
           _label('Transaction Type'),

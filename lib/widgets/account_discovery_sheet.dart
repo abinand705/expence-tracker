@@ -311,7 +311,8 @@ class _AccountInitializationSheetState extends State<AccountInitializationSheet>
       final debitRule = SmsRecognitionRule(
         id: '',
         accountId: accountId,
-        ruleLabel: '${_bankNameCtrl.text.trim()} Debit',
+        ruleLabel: 'Debit',
+        bankIdentifier: d.bankCode.isNotEmpty ? d.bankCode.toUpperCase() : null,
         senderPatterns: effectiveSenders,
         accountIdentifier: d.accountLast4,
         debitKeywords: const [
@@ -330,7 +331,8 @@ class _AccountInitializationSheetState extends State<AccountInitializationSheet>
       final creditRule = SmsRecognitionRule(
         id: '',
         accountId: accountId,
-        ruleLabel: '${_bankNameCtrl.text.trim()} Credit',
+        ruleLabel: 'Credit',
+        bankIdentifier: d.bankCode.isNotEmpty ? d.bankCode.toUpperCase() : null,
         senderPatterns: effectiveSenders,
         accountIdentifier: d.accountLast4,
         debitKeywords: const [],

@@ -12,10 +12,10 @@ import 'package:expense_tracker/widgets/dashboard/balance_card.dart';
 
 void main() {
   group('MoneyTrack — Temporarily Disable Aggregate Total Balance Tests', () {
-    // ── Test 1 — Total Balance disabled ──────────────────────────────────────
-    testWidgets('Test 1: BalanceCard displays "Currently unavailable" and no numeric balance when disabled', (tester) async {
-      // 1. Verify feature flag is disabled by default
-      expect(FeatureFlags.enableTotalBalance, isFalse);
+    // ── Test 1 — Total Balance enabled ──────────────────────────────────────
+    testWidgets('Test 1: BalanceCard displays numeric balance and not "Currently unavailable" when enabled', (tester) async {
+      // 1. Verify feature flag is enabled
+      expect(FeatureFlags.enableTotalBalance, isTrue);
 
       final formatter = NumberFormat.currency(symbol: '₹ ', decimalDigits: 2);
 
@@ -30,19 +30,10 @@ void main() {
         ),
       );
 
-      // Verify "TOTAL BALANCE" header and "Currently unavailable" message
+      // Verify "TOTAL BALANCE" header and numeric balance
       expect(find.text('TOTAL BALANCE'), findsOneWidget);
-      expect(find.text('Currently unavailable'), findsOneWidget);
-
-      // Verify no numeric currency or zero is displayed for total balance
-      expect(find.text('₹ 40,000.00'), findsNothing);
-      expect(find.text('40000'), findsNothing);
-      expect(find.text('40,000'), findsNothing);
-      expect(find.text('₹0'), findsNothing);
-      expect(find.text('₹0.00'), findsNothing);
-      expect(find.text('0'), findsNothing);
-      expect(find.text('0.0'), findsNothing);
-      expect(find.text('₹--'), findsNothing);
+      expect(find.text('Currently unavailable'), findsNothing);
+      expect(find.text('₹ 40,000.00'), findsOneWidget);
     });
 
     // ── Test 2 — Individual account balance remains accessible ───────────────
@@ -111,16 +102,16 @@ void main() {
 
       expect(totalExpenses, 500.0);
 
-      // Aggregate balance calculation is skipped when disabled
+      // Aggregate balance calculation is executed when enabled
       double aggregateBalance = 0.0;
       if (FeatureFlags.enableTotalBalance) {
         aggregateBalance = 25000.0 - 500.0;
       }
-      expect(aggregateBalance, 0.0); // Not calculated because flag is false
+      expect(aggregateBalance, 24500.0);
     });
 
     // ── Test 4 — Income processing remains functional ─────────────────────────
-    test('Test 4: Income processing and analytics work without calculating aggregate Total Balance', () {
+    test('Test 4: Income processing and analytics work with calculating aggregate Total Balance', () {
       final now = DateTime.now();
       final incomeTx = model_tx.Transaction(
         id: 'tx_inc_1',
@@ -141,12 +132,12 @@ void main() {
 
       expect(totalIncome, 50000.0);
 
-      // Aggregate balance calculation is skipped when disabled
+      // Aggregate balance calculation is executed when enabled
       double aggregateBalance = 0.0;
       if (FeatureFlags.enableTotalBalance) {
         aggregateBalance = 15000.0 + 50000.0;
       }
-      expect(aggregateBalance, 0.0); // Not calculated because flag is false
+      expect(aggregateBalance, 65000.0);
     });
 
     // ── Test 5 — SMS transaction import continues ─────────────────────────────

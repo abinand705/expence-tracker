@@ -15,6 +15,10 @@ class SmsRecognitionRule {
   /// Human-readable label: "Debit", "Credit", "UPI Debit", etc.
   final String ruleLabel;
 
+  /// Stable bank identifier (e.g. "KGBANK", "HDFCBK", "SBIINB").
+  /// When set, this is the primary Level 1 recognition key.
+  final String? bankIdentifier;
+
   /// SMS sender IDs that trigger this rule.
   /// Examples: ["VK-KGBANK", "AD-KGBANK", "KGBANK"]
   final List<String> senderPatterns;
@@ -58,6 +62,15 @@ class SmsRecognitionRule {
   /// Whether this rule is active.
   final bool isEnabled;
 
+  /// Specific account representation patterns (e.g. "XXXX1234", "Account ending 1234").
+  final List<String> accountPatterns;
+
+  /// Specific transaction wording patterns (e.g. "UPI transaction successful").
+  final List<String> transactionPatterns;
+
+  /// Specific balance wording patterns (e.g. "Available balance is", "Avl Bal").
+  final List<String> balancePatterns;
+
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -65,6 +78,7 @@ class SmsRecognitionRule {
     required this.id,
     required this.accountId,
     required this.ruleLabel,
+    this.bankIdentifier,
     required this.senderPatterns,
     required this.accountIdentifier,
     required this.debitKeywords,
@@ -77,6 +91,9 @@ class SmsRecognitionRule {
     this.dateHint,
     this.sampleSms,
     this.isEnabled = true,
+    this.accountPatterns = const [],
+    this.transactionPatterns = const [],
+    this.balancePatterns = const [],
     required this.createdAt,
     this.updatedAt,
   });
@@ -86,6 +103,7 @@ class SmsRecognitionRule {
     String? id,
     String? accountId,
     String? ruleLabel,
+    String? bankIdentifier,
     List<String>? senderPatterns,
     String? accountIdentifier,
     List<String>? debitKeywords,
@@ -98,6 +116,9 @@ class SmsRecognitionRule {
     String? dateHint,
     String? sampleSms,
     bool? isEnabled,
+    List<String>? accountPatterns,
+    List<String>? transactionPatterns,
+    List<String>? balancePatterns,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -105,6 +126,7 @@ class SmsRecognitionRule {
       id: id ?? this.id,
       accountId: accountId ?? this.accountId,
       ruleLabel: ruleLabel ?? this.ruleLabel,
+      bankIdentifier: bankIdentifier ?? this.bankIdentifier,
       senderPatterns: senderPatterns ?? this.senderPatterns,
       accountIdentifier: accountIdentifier ?? this.accountIdentifier,
       debitKeywords: debitKeywords ?? this.debitKeywords,
@@ -117,6 +139,9 @@ class SmsRecognitionRule {
       dateHint: dateHint ?? this.dateHint,
       sampleSms: sampleSms ?? this.sampleSms,
       isEnabled: isEnabled ?? this.isEnabled,
+      accountPatterns: accountPatterns ?? this.accountPatterns,
+      transactionPatterns: transactionPatterns ?? this.transactionPatterns,
+      balancePatterns: balancePatterns ?? this.balancePatterns,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -127,6 +152,7 @@ class SmsRecognitionRule {
       'id': id,
       'accountId': accountId,
       'ruleLabel': ruleLabel,
+      'bankIdentifier': bankIdentifier,
       'senderPatterns': senderPatterns,
       'accountIdentifier': accountIdentifier,
       'debitKeywords': debitKeywords,
@@ -139,6 +165,9 @@ class SmsRecognitionRule {
       'dateHint': dateHint,
       'sampleSms': sampleSms,
       'isEnabled': isEnabled,
+      'accountPatterns': accountPatterns,
+      'transactionPatterns': transactionPatterns,
+      'balancePatterns': balancePatterns,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
     };
@@ -160,6 +189,7 @@ class SmsRecognitionRule {
       id: map['id'] as String? ?? '',
       accountId: map['accountId'] as String? ?? '',
       ruleLabel: map['ruleLabel'] as String? ?? 'Rule',
+      bankIdentifier: map['bankIdentifier'] as String?,
       senderPatterns: parseStringList(map['senderPatterns']),
       accountIdentifier: map['accountIdentifier'] as String? ?? '',
       debitKeywords: parseStringList(map['debitKeywords']),
@@ -172,6 +202,9 @@ class SmsRecognitionRule {
       dateHint: map['dateHint'] as String?,
       sampleSms: map['sampleSms'] as String?,
       isEnabled: map['isEnabled'] as bool? ?? true,
+      accountPatterns: parseStringList(map['accountPatterns']),
+      transactionPatterns: parseStringList(map['transactionPatterns']),
+      balancePatterns: parseStringList(map['balancePatterns']),
       createdAt: parseDate(map['createdAt']),
       updatedAt: map['updatedAt'] != null ? parseDate(map['updatedAt']) : null,
     );
@@ -180,6 +213,20 @@ class SmsRecognitionRule {
   /// Normalises a sender string for comparison (uppercase, alphanumeric only).
   static String normaliseSender(String sender) {
     return sender.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
+
+  /// Normalises a bank identifier string (uppercase, alphanumeric only).
+  static String normaliseBankIdentifier(String id) {
+    return id.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+  }
+
+  /// Returns true if [candidate] matches this rule's bankIdentifier.
+  bool matchesBankIdentifier(String candidate) {
+    if (bankIdentifier == null || bankIdentifier!.trim().isEmpty) return false;
+    final normRuleBank = normaliseBankIdentifier(bankIdentifier!);
+    final normCandidate = normaliseBankIdentifier(candidate);
+    return normRuleBank.isNotEmpty &&
+        (normRuleBank == normCandidate || normCandidate.contains(normRuleBank));
   }
 
   /// Returns true if [sender] matches any of this rule's senderPatterns.
@@ -195,13 +242,36 @@ class SmsRecognitionRule {
     return false;
   }
 
-  /// Returns true if [smsBody] contains the configured accountIdentifier.
-  /// Uses last-N-digit suffix matching (consistent with MoneyTrack convention).
+  /// Returns true if [smsBody] contains the configured accountIdentifier or any accountPattern.
+  /// Uses last-N-digit suffix matching and pattern phrase matching.
   bool matchesAccountIdentifier(String smsBody) {
+    // 1. Check configured account patterns if present
+    if (accountPatterns.isNotEmpty) {
+      for (final pattern in accountPatterns) {
+        final digits = pattern.replaceAll(RegExp(r'[^0-9]'), '');
+        if (digits.isNotEmpty && smsBody.contains(digits)) return true;
+        if (pattern.trim().isNotEmpty && smsBody.toLowerCase().contains(pattern.trim().toLowerCase())) return true;
+      }
+    }
+
     if (accountIdentifier.trim().isEmpty) return true;
     final digits = accountIdentifier.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isEmpty) return true;
     // Look for the digit sequence in the SMS body
     return smsBody.contains(digits);
+  }
+
+  /// Returns true if [smsBody] matches any of this rule's transactionPatterns.
+  bool matchesTransactionPattern(String smsBody) {
+    if (transactionPatterns.isEmpty) return false;
+    final lower = smsBody.toLowerCase();
+    return transactionPatterns.any((p) => p.trim().isNotEmpty && lower.contains(p.trim().toLowerCase()));
+  }
+
+  /// Returns true if [smsBody] matches any of this rule's balancePatterns.
+  bool matchesBalancePattern(String smsBody) {
+    if (balancePatterns.isEmpty) return false;
+    final lower = smsBody.toLowerCase();
+    return balancePatterns.any((p) => p.trim().isNotEmpty && lower.contains(p.trim().toLowerCase()));
   }
 }

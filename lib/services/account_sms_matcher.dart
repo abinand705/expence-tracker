@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/account.dart';
 import '../models/sms_recognition_rule.dart';
+import 'bank_detection_service.dart';
 
 /// Result of matching an incoming SMS to a configured account.
 class AccountMatchResult {
@@ -23,13 +24,11 @@ class AccountMatchResult {
 ///
 /// No match = no transaction. This is enforced at this layer.
 ///
-/// Usage during SMS scanning:
-/// ```dart
-/// final matcher = AccountSmsMatcher(accounts, rules);
-/// final match = matcher.match(senderName, smsBody);
-/// if (match == null) return; // skip — no configured account matched
-/// // proceed with transaction creation using match.accountId
-/// ```
+/// RECOGNITION HIERARCHY:
+/// LEVEL 1: Bank Identifier (extracted from sender header, e.g. KGBANK from VK-KGBANK-S)
+/// LEVEL 2: Account Identifier / Account Pattern (e.g. 1234 from A/c XX1234)
+/// LEVEL 3: Transaction / Balance Pattern (e.g. debit/credit keywords)
+/// LEVEL 4: Sender ID fallback (e.g. VK-KGBANK-S if bank identifier not matched)
 class AccountSmsMatcher {
   /// Map from accountId to its list of enabled SMS rules.
   final Map<String, List<SmsRecognitionRule>> rulesByAccount;
@@ -52,7 +51,22 @@ class AccountSmsMatcher {
   ///
   /// NEVER returns a result that would cause account creation.
   AccountMatchResult? match(String sender, String smsBody) {
+    final extractedBankId = BankDetectionService.extractBankIdentifier(sender);
     final List<AccountMatchResult> candidates = [];
+
+    // Count how many enabled accounts could match this bank identifier
+    int accountsSharingBank = 0;
+    if (extractedBankId != null) {
+      for (final entry in _rulesByAccount.entries) {
+        final acc = _accountById[entry.key];
+        if (acc == null || !acc.smsTrackingEnabled) continue;
+        final hasBankRule = entry.value.any((r) =>
+            r.isEnabled && (r.matchesBankIdentifier(extractedBankId) || r.matchesSender(sender)));
+        if (hasBankRule) accountsSharingBank++;
+      }
+    }
+
+    final multipleAccountsAtBank = accountsSharingBank > 1;
 
     for (final entry in _rulesByAccount.entries) {
       final accountId = entry.key;
@@ -65,13 +79,35 @@ class AccountSmsMatcher {
       for (final rule in rules) {
         if (!rule.isEnabled) continue;
 
-        // Step 1: Sender must match
-        if (!rule.matchesSender(sender)) continue;
+        // LEVEL 1: Check Bank Identifier match
+        bool bankOrSenderMatched = false;
+        if (extractedBankId != null && rule.bankIdentifier != null && rule.bankIdentifier!.isNotEmpty) {
+          if (rule.matchesBankIdentifier(extractedBankId)) {
+            bankOrSenderMatched = true;
+          }
+        }
 
-        // Step 2: Account identifier must appear in SMS body
+        // LEVEL 4 (Fallback): Check Sender Pattern match
+        if (!bankOrSenderMatched) {
+          if (rule.matchesSender(sender)) {
+            bankOrSenderMatched = true;
+          }
+        }
+
+        if (!bankOrSenderMatched) continue;
+
+        // Multiple accounts safety: If multiple accounts exist for this bank,
+        // a specific account identifier in the SMS body is mandatory.
+        if (multipleAccountsAtBank &&
+            rule.accountIdentifier.trim().isEmpty &&
+            rule.accountPatterns.isEmpty) {
+          continue;
+        }
+
+        // LEVEL 2: Account identifier must appear in SMS body
         if (!rule.matchesAccountIdentifier(smsBody)) continue;
 
-        // Both sender and account identifier match — this is a candidate
+        // Both bank/sender and account identifier match — candidate found
         candidates.add(AccountMatchResult(
           accountId: accountId,
           matchedRule: rule,
@@ -81,7 +117,7 @@ class AccountSmsMatcher {
     }
 
     if (candidates.isEmpty) {
-      debugPrint('[AccountSmsMatcher] no configured account matched sender=$sender');
+      debugPrint('[AccountSmsMatcher] no configured account matched sender=$sender (bankId=$extractedBankId)');
       return null;
     }
 
