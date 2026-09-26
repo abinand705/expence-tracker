@@ -7,19 +7,32 @@ import '../theme/app_typography.dart';
 import '../widgets/transaction_card.dart';
 import '../widgets/app_drawer.dart';
 
+import '../widgets/add_transaction_sheet.dart';
+import '../repositories/account_repository.dart';
+import '../repositories/category_repository.dart';
+
 class TransactionsScreen extends StatefulWidget {
-  const TransactionsScreen({super.key});
+  final TransactionRepository? transactionRepository;
+  final AccountRepository? accountRepository;
+  final CategoryRepository? categoryRepository;
+
+  const TransactionsScreen({
+    super.key,
+    this.transactionRepository,
+    this.accountRepository,
+    this.categoryRepository,
+  });
 
   @override
   State<TransactionsScreen> createState() => _TransactionsScreenState();
 }
 
 class _TransactionsScreenState extends State<TransactionsScreen> {
-  final TransactionRepository _transactionRepo = TransactionRepository();
+  late final TransactionRepository _transactionRepo;
   
   String _selectedFilter = 'All';
   String _searchQuery = '';
-  final List<String> _filters = ['All', 'UPI', 'Debits', 'Credits'];
+  final List<String> _filters = ['All', 'UPI', 'Debits', 'Credits', 'Manual'];
   
   List<Transaction> _allTransactions = [];
   bool _isLoading = true;
@@ -29,6 +42,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
   @override
   void initState() {
     super.initState();
+    _transactionRepo = widget.transactionRepository ?? TransactionRepository();
     _startListening();
   }
 
@@ -73,6 +87,15 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
     await Future.delayed(const Duration(milliseconds: 300));
   }
 
+  void _openAddTransactionSheet(BuildContext context) {
+    showAddTransactionSheet(
+      context: context,
+      transactionRepository: _transactionRepo,
+      accountRepository: widget.accountRepository,
+      categoryRepository: widget.categoryRepository,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     List<Transaction> filteredTransactions = _allTransactions.where((t) {
@@ -83,7 +106,8 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         final matchCategory = t.displayCategory.toLowerCase().contains(query) || t.category.toLowerCase().contains(query);
         final matchSubtitle = (t.subtitle ?? '').toLowerCase().contains(query);
         final matchDescription = (t.description ?? '').toLowerCase().contains(query);
-        if (!matchTitle && !matchMerchant && !matchCategory && !matchSubtitle && !matchDescription) return false;
+        final matchSource = t.transactionSource.toLowerCase().contains(query);
+        if (!matchTitle && !matchMerchant && !matchCategory && !matchSubtitle && !matchDescription && !matchSource) return false;
       }
       
       if (_selectedFilter == 'All') return true;
@@ -91,6 +115,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       if (_selectedFilter == 'UPI') return msg.contains('upi');
       if (_selectedFilter == 'Debits') return t.type == TransactionType.expense;
       if (_selectedFilter == 'Credits') return t.type == TransactionType.income;
+      if (_selectedFilter == 'Manual') return t.isManual || t.transactionSource == 'manual';
       return true;
     }).toList();
 
@@ -104,6 +129,14 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         ),
         title: Text('Transactions', style: AppTypography.headlineMd),
         elevation: 0,
+        actions: [
+          IconButton(
+            key: const Key('add_transaction_button'),
+            icon: const Icon(Icons.add),
+            tooltip: 'Add Transaction',
+            onPressed: () => _openAddTransactionSheet(context),
+          ),
+        ],
       ),
       drawer: const AppDrawer(),
       body: Column(

@@ -3,7 +3,6 @@ import '../models/account.dart';
 import '../models/sms_recognition_rule.dart';
 import '../repositories/account_repository.dart';
 import '../repositories/sms_rule_repository.dart';
-import '../services/sms_rule_builder.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_typography.dart';
@@ -16,7 +15,6 @@ import 'add_sms_rule_screen.dart';
 /// - SMS tracking toggle (ON/OFF)
 /// - List of configured rules
 /// - Add/Edit/Delete rule actions
-/// - Test SMS feature (never creates a transaction)
 class AccountSmsConfigScreen extends StatefulWidget {
   final Account account;
 
@@ -172,17 +170,6 @@ class _AccountSmsConfigScreenState extends State<AccountSmsConfigScreen> {
     if (result == true) await _loadRules();
   }
 
-  void _showTestSms() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.xl))),
-      builder: (ctx) => _TestSmsSheet(account: _account, rules: _rules),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -244,21 +231,6 @@ class _AccountSmsConfigScreenState extends State<AccountSmsConfigScreen> {
                     _buildNoRulesCard(cs)
                   else
                     ..._rules.map((rule) => _buildRuleCard(cs, rule)),
-
-                  const SizedBox(height: AppSpacing.lg),
-
-                  // Test SMS button
-                  if (_rules.isNotEmpty)
-                    OutlinedButton.icon(
-                      onPressed: _showTestSms,
-                      icon: const Icon(Icons.science_outlined),
-                      label: const Text('Test SMS'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 48),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.base)),
-                      ),
-                    ),
 
                   const SizedBox(height: 80),
                 ],
@@ -483,218 +455,4 @@ class _AccountSmsConfigScreenState extends State<AccountSmsConfigScreen> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Test SMS Bottom Sheet
-// ─────────────────────────────────────────────────────────────────────────────
 
-class _TestSmsSheet extends StatefulWidget {
-  final Account account;
-  final List<SmsRecognitionRule> rules;
-
-  const _TestSmsSheet({required this.account, required this.rules});
-
-  @override
-  State<_TestSmsSheet> createState() => _TestSmsSheetState();
-}
-
-class _TestSmsSheetState extends State<_TestSmsSheet> {
-  final _smsCtrl = TextEditingController();
-  final _senderCtrl = TextEditingController();
-  SmsRuleSuggestion? _result;
-  bool _analyzed = false;
-  String? _matchedSender;
-
-  @override
-  void dispose() {
-    _smsCtrl.dispose();
-    _senderCtrl.dispose();
-    super.dispose();
-  }
-
-  void _analyze() {
-    if (_smsCtrl.text.trim().isEmpty) return;
-    if (_senderCtrl.text.trim().isEmpty) return;
-
-    // Check if any configured rule matches
-    bool senderMatched = false;
-    bool idMatched = false;
-    SmsRecognitionRule? matchedRule;
-
-    for (final rule in widget.rules) {
-      if (rule.matchesSender(_senderCtrl.text.trim())) {
-        senderMatched = true;
-        if (rule.matchesAccountIdentifier(_smsCtrl.text.trim())) {
-          idMatched = true;
-          matchedRule = rule;
-          break;
-        }
-      }
-    }
-
-    final suggestion = SmsRuleBuilder.parseSampleSms(
-      smsBody: _smsCtrl.text.trim(),
-      sender: _senderCtrl.text.trim(),
-    );
-
-    setState(() {
-      _result = suggestion;
-      _analyzed = true;
-      _matchedSender = matchedRule != null ? 'Yes — ${matchedRule.ruleLabel} rule' : null;
-
-      if (!senderMatched) {
-        _matchedSender = 'No — sender "${_senderCtrl.text.trim()}" not in configured patterns';
-      } else if (!idMatched) {
-        _matchedSender = 'No — account identifier not found in SMS';
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppSpacing.lg,
-        right: AppSpacing.lg,
-        top: AppSpacing.lg,
-        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                  width: 40, height: 4,
-                  decoration: BoxDecoration(
-                      color: cs.onSurfaceVariant,
-                      borderRadius: BorderRadius.circular(2))),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text('Test SMS', style: AppTypography.headlineMd),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: cs.primaryContainer.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Text(
-                '⚠ This is a test only. No transaction will be saved.',
-                style: AppTypography.bodyMd.copyWith(
-                    color: cs.primary, fontWeight: FontWeight.w600, fontSize: 12),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _senderCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Sender ID',
-                hintText: 'e.g. VK-KGBANK',
-                border: OutlineInputBorder(),
-              ),
-              textCapitalization: TextCapitalization.characters,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _smsCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Paste SMS',
-                hintText: 'Paste a real bank SMS here…',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 4,
-              minLines: 3,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            ElevatedButton(
-              onPressed: _analyze,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.base)),
-              ),
-              child: const Text('Analyse'),
-            ),
-            if (_analyzed && _result != null) ...[
-              const SizedBox(height: AppSpacing.lg),
-              const Divider(),
-              const SizedBox(height: AppSpacing.sm),
-              Text('Results', style: AppTypography.headlineMd.copyWith(fontSize: 16)),
-              const SizedBox(height: AppSpacing.sm),
-              _resultRow(cs, 'Matched Account',
-                  _matchedSender ?? 'No match',
-                  isGood: _matchedSender != null && _matchedSender!.startsWith('Yes')),
-              _resultRow(cs, 'Transaction Type', _result!.transactionTypeDisplay),
-              _resultRow(cs, 'Amount',
-                  _result!.detectedAmount != null
-                      ? '₹${_result!.detectedAmount!.toStringAsFixed(2)}'
-                      : 'Not detected'),
-              _resultRow(cs, 'Date',
-                  _result!.detectedDateTime?.toString() ?? 'Not detected'),
-              _resultRow(cs, 'Reference ID', _result!.detectedReferenceId ?? 'Not detected'),
-              _resultRow(cs, 'Balance',
-                  _result!.detectedBalance != null
-                      ? (_result!.detectedBalance! < 0
-                          ? '-₹${(-_result!.detectedBalance!).toStringAsFixed(2)}'
-                          : '₹${_result!.detectedBalance!.toStringAsFixed(2)}')
-                      : 'Not detected'),
-              const SizedBox(height: AppSpacing.md),
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.sm),
-                decoration: BoxDecoration(
-                  color: (_matchedSender != null && _matchedSender!.startsWith('Yes'))
-                      ? AppColors.successGreen.withValues(alpha: 0.1)
-                      : AppColors.errorRed.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: Text(
-                  (_matchedSender != null && _matchedSender!.startsWith('Yes'))
-                      ? '✓ Would create this transaction (test only — not saved)'
-                      : '✗ Would NOT create a transaction for this SMS',
-                  style: TextStyle(
-                    color: (_matchedSender != null && _matchedSender!.startsWith('Yes'))
-                        ? AppColors.successGreen
-                        : AppColors.errorRed,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _resultRow(ColorScheme cs, String label, String value, {bool? isGood}) {
-    Color? valueColor;
-    if (isGood == true) valueColor = AppColors.successGreen;
-    if (isGood == false) valueColor = AppColors.errorRed;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(label, style: AppTypography.labelMuted.copyWith(fontSize: 12)),
-          ),
-          Expanded(
-            child: Text(value,
-                style: AppTypography.bodyMd.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: valueColor ?? cs.onSurface,
-                    fontSize: 13)),
-          ),
-        ],
-      ),
-    );
-  }
-}

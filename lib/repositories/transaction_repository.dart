@@ -84,14 +84,19 @@ class TransactionRepository {
 
   Future<String> addTransaction(model.Transaction transaction) async {
     try {
-      final docRef = _transactionsRef.doc(transaction.id);
+      final docRef = transaction.id.isEmpty
+          ? _transactionsRef.doc()
+          : _transactionsRef.doc(transaction.id);
       
-      final data = transaction.toMap();
+      final txToSave = transaction.id.isEmpty
+          ? transaction.copyWith(id: docRef.id)
+          : transaction;
+      final data = txToSave.toMap();
       data['createdAt'] = FieldValue.serverTimestamp();
       data['updatedAt'] = FieldValue.serverTimestamp();
       
       await docRef.set(data);
-      debugPrint('[REPOSITORY] Transactions written: 1 (id: ${transaction.id})');
+      debugPrint('[REPOSITORY] Transactions written: 1 (id: ${txToSave.id}) to path: ${docRef.path} (database: moneytrack)');
       return docRef.id;
     } catch (e) {
       debugPrint('[REPOSITORY] Transaction write failed: $e');
