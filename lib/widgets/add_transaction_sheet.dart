@@ -288,9 +288,13 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Add Transaction',
-                            style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
+                          Expanded(
+                            child: Text(
+                              'Add Transaction',
+                              style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           IconButton(
                             icon: const Icon(Icons.close),
@@ -389,6 +393,8 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                           child: Text(
                             DateFormat('dd MMM yyyy, hh:mm a').format(_selectedDate),
                             style: AppTypography.bodyMd.copyWith(color: cs.onSurface),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
@@ -397,6 +403,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                       // Category Dropdown
                       DropdownButtonFormField<String>(
                         key: const Key('manual_tx_category_dropdown'),
+                        isExpanded: true,
                         initialValue: _selectedCategory,
                         decoration: const InputDecoration(
                           labelText: 'Category',
@@ -407,25 +414,28 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                             ? [
                                 const DropdownMenuItem<String>(
                                   value: 'Food',
-                                  child: Text('Food'),
+                                  child: Text('Food', overflow: TextOverflow.ellipsis),
                                 ),
                                 const DropdownMenuItem<String>(
                                   value: 'Bills',
-                                  child: Text('Bills'),
+                                  child: Text('Bills', overflow: TextOverflow.ellipsis),
                                 ),
                                 const DropdownMenuItem<String>(
                                   value: 'Shopping',
-                                  child: Text('Shopping'),
+                                  child: Text('Shopping', overflow: TextOverflow.ellipsis),
                                 ),
                                 const DropdownMenuItem<String>(
                                   value: 'Others',
-                                  child: Text('Others'),
+                                  child: Text('Others', overflow: TextOverflow.ellipsis),
                                 ),
                               ]
                             : _categories.map((cat) {
                                 return DropdownMenuItem<String>(
                                   value: cat.name,
-                                  child: Text(cat.name),
+                                  child: Text(
+                                    cat.name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 );
                               }).toList(),
                         onChanged: (val) {
@@ -471,6 +481,7 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                       ] else ...[
                         DropdownButtonFormField<String>(
                           key: const Key('manual_tx_account_dropdown'),
+                          isExpanded: true,
                           initialValue: _selectedAccountId,
                           decoration: const InputDecoration(
                             labelText: 'Account',
@@ -480,7 +491,10 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                           items: _accounts.map((acc) {
                             return DropdownMenuItem<String>(
                               value: acc.id,
-                              child: Text(_formatAccountLabel(acc)),
+                              child: Text(
+                                _formatAccountLabel(acc),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) {

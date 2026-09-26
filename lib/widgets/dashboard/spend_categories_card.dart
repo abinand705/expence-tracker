@@ -72,7 +72,7 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.xl),
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(AppRadius.xl),
@@ -85,12 +85,12 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
             'Spend Categories',
             style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               SizedBox(
-                width: 120,
-                height: 120,
+                width: 100,
+                height: 100,
                 child: CustomPaint(
                   painter: DonutChartPainter(
                     foodPct: pFood,
@@ -106,30 +106,33 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
                           'Total',
                           style: AppTypography.labelMuted.copyWith(fontSize: 10, color: cs.onSurfaceVariant),
                         ),
-                        Text(
-                          displayTotal >= 1000 ? '${(displayTotal/1000).toStringAsFixed(1)}k' : displayTotal.toStringAsFixed(0),
-                          style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            displayTotal >= 1000 ? '${(displayTotal/1000).toStringAsFixed(1)}k' : displayTotal.toStringAsFixed(0),
+                            style: AppTypography.bodyLg.copyWith(fontWeight: FontWeight.bold, color: cs.onSurface),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.xl),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   children: [
                     if (pFood > 0) ...[
                       _buildLegendItem(context, 'Food', '₹${food.toStringAsFixed(0)} (${(pFood * 100).toStringAsFixed(0)}%)', const Color(0xFFC2185B)),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xs),
                     ],
                     if (pShop > 0) ...[
                       _buildLegendItem(context, 'Shopping', '₹${shopping.toStringAsFixed(0)} (${(pShop * 100).toStringAsFixed(0)}%)', const Color(0xFF7B1FA2)),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xs),
                     ],
                     if (pBills > 0) ...[
                       _buildLegendItem(context, 'Bills', '₹${bills.toStringAsFixed(0)} (${(pBills * 100).toStringAsFixed(0)}%)', const Color(0xFF1976D2)),
-                      const SizedBox(height: AppSpacing.sm),
+                      const SizedBox(height: AppSpacing.xs),
                     ],
                     if (pOthers > 0) ...[
                       _buildLegendItem(context, 'Others', '₹${others.toStringAsFixed(0)} (${(pOthers * 100).toStringAsFixed(0)}%)', const Color(0xFFF57C00)),
@@ -149,28 +152,40 @@ class _SpendCategoriesCardState extends State<SpendCategoriesCard> {
   Widget _buildLegendItem(BuildContext context, String title, String percentage, Color color) {
     final cs = Theme.of(context).colorScheme;
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Text(
-              title,
-              style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ],
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
         ),
-        Text(
-          percentage,
-          style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
+        const SizedBox(width: AppSpacing.xs),
+        Expanded(
+          flex: 2,
+          child: Text(
+            title,
+            style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(
+          flex: 3,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(
+              percentage,
+              style: AppTypography.bodyMd.copyWith(
+                color: cs.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+            ),
+          ),
         ),
       ],
     );
@@ -195,7 +210,7 @@ class DonutChartPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    const strokeWidth = 14.0;
+    const strokeWidth = 12.0;
 
     final rect = Rect.fromCircle(center: center, radius: radius - strokeWidth / 2);
     

@@ -23,6 +23,7 @@ import 'package:expense_tracker/utils/dropdown_safety.dart';
 import 'package:expense_tracker/utils/expense_parser.dart';
 import 'package:expense_tracker/utils/feature_flags.dart';
 import 'package:expense_tracker/widgets/dashboard/balance_card.dart';
+import 'package:expense_tracker/widgets/account_pattern_review_sheet.dart';
 
 // ── In-Memory Fake Repositories ──────────────────────────────────────────────
 
@@ -1675,6 +1676,131 @@ void main() {
 
       // Verify Scan Messages for Accounts remains accessible
       expect(find.text('Scan Messages for Accounts'), findsOneWidget);
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section 34: Unresolved Account Pattern Section Removal Tests
+  // ══════════════════════════════════════════════════════════════════════════
+  group('Section 34: Unresolved Account Pattern Section Removal Tests', () {
+    testWidgets('AccountPatternReviewSheet does not contain Needs Review (Unresolved Account) section', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final sampleAccount = Account(
+        id: 'acc_1',
+        name: 'HDFC Bank',
+        bankName: 'HDFC',
+        accountNumber: '1234',
+        accountType: 'Savings',
+        balance: 1000,
+        currentBalance: 1000,
+        accentColor: Colors.blue,
+      );
+
+      final recommendations = [
+        AccountPatternRecommendation(
+          recommendationId: 'rec_1',
+          accountId: 'acc_1',
+          bankName: 'HDFC',
+          bankIdentifier: 'HDFCBK',
+          accountLast4: '1234',
+          patternType: 'sender_pattern',
+          patternValue: 'HDFCBK',
+          reason: 'Matches HDFC account',
+          confidence: 0.95,
+        ),
+        AccountPatternRecommendation(
+          recommendationId: 'rec_unresolved',
+          accountId: null, // Unresolved
+          bankName: 'Unknown Bank',
+          bankIdentifier: 'UNKBK',
+          accountLast4: '9999',
+          patternType: 'bank_identifier',
+          patternValue: 'UNKBK',
+          reason: 'Unresolved bank identifier',
+          confidence: 0.70,
+        ),
+      ];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  showAccountPatternReviewSheet(
+                    context: context,
+                    recommendations: recommendations,
+                    accounts: [sampleAccount],
+                  );
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+      // Ensure the "Needs Review (Unresolved Account)" text is NOT rendered anywhere
+      expect(find.text('Needs Review (Unresolved Account)'), findsNothing);
+      expect(find.textContaining('Needs Review'), findsNothing);
+      expect(find.textContaining('These patterns could not be automatically linked'), findsNothing);
+
+      // Verify only the actionable account is displayed
+      expect(find.textContaining('HDFC Bank'), findsOneWidget);
+      expect(find.text('1 found'), findsOneWidget);
+    });
+
+    testWidgets('showAccountPatternReviewSheet ignores completely unresolved recommendations list', (tester) async {
+      final unresolvedOnly = [
+        AccountPatternRecommendation(
+          recommendationId: 'rec_unresolved_1',
+          accountId: null,
+          bankName: 'Unknown Bank',
+          bankIdentifier: 'UNKBK',
+          accountLast4: '9999',
+          patternType: 'bank_identifier',
+          patternValue: 'UNKBK',
+          reason: 'Unresolved',
+          confidence: 0.70,
+        ),
+      ];
+
+      bool opened = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return ElevatedButton(
+                  onPressed: () async {
+                    final res = await showAccountPatternReviewSheet(
+                      context: context,
+                      recommendations: unresolvedOnly,
+                      accounts: [],
+                    );
+                    if (res != null) opened = true;
+                  },
+                  child: const Text('Scan'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Scan'));
+      await tester.pumpAndSettle();
+
+      expect(opened, isFalse);
+      expect(find.text('Needs Review (Unresolved Account)'), findsNothing);
+      expect(find.byType(AccountPatternReviewSheet), findsNothing);
     });
   });
 }

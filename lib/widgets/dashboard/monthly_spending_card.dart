@@ -38,24 +38,35 @@ class MonthlySpendingCard extends StatelessWidget {
             style: AppTypography.bodyMd.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            formatter.format(currentSpend),
-            style: AppTypography.headlineMd.copyWith(
-              color: isWithinTarget ? cs.onSurface : AppColors.errorRed,
-              fontWeight: FontWeight.bold
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              formatter.format(currentSpend),
+              style: AppTypography.headlineMd.copyWith(
+                color: isWithinTarget ? cs.onSurface : AppColors.errorRed,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              Icon(isSpendUp ? Icons.trending_up : Icons.trending_down,
-                color: isSpendUp ? AppColors.errorRed : AppColors.successGreen, size: 14),
+              Icon(
+                isSpendUp ? Icons.trending_up : Icons.trending_down,
+                color: isSpendUp ? AppColors.errorRed : AppColors.successGreen,
+                size: 14,
+              ),
               const SizedBox(width: 4),
-              Text(
-                '${spendChange.abs().toStringAsFixed(1)}% vs last month',
-                style: AppTypography.labelMuted.copyWith(
-                  color: isSpendUp ? AppColors.errorRed : AppColors.successGreen,
-                  fontSize: 10
+              Expanded(
+                child: Text(
+                  '${spendChange.abs().toStringAsFixed(1)}% vs last month',
+                  style: AppTypography.labelMuted.copyWith(
+                    color: isSpendUp ? AppColors.errorRed : AppColors.successGreen,
+                    fontSize: 10,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

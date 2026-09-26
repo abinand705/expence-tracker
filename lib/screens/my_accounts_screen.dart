@@ -123,10 +123,11 @@ class _MyAccountsScreenState extends State<MyAccountsScreen> {
       }
 
       if (mounted) {
-        if (result.recommendations.isNotEmpty) {
+        final actionableRecs = result.recommendations.where((r) => r.accountId != null).toList();
+        if (actionableRecs.isNotEmpty) {
           await showAccountPatternReviewSheet(
             context: context,
-            recommendations: result.recommendations,
+            recommendations: actionableRecs,
             accounts: _accounts,
             onApprove: (approved) async {
               await patternService.applyApprovedPatterns(

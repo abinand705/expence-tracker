@@ -42,9 +42,13 @@ class BudgetProgressCard extends StatelessWidget {
               style: AppTypography.bodyMd.copyWith(color: Colors.white70),
             ),
             const SizedBox(height: AppSpacing.xs),
-            Text(
-              formatter.format(targetRemaining.abs()),
-              style: AppTypography.headlineMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                formatter.format(targetRemaining.abs()),
+                style: AppTypography.headlineMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
             Row(
@@ -52,9 +56,13 @@ class BudgetProgressCard extends StatelessWidget {
                 Icon(isWithinTarget ? Icons.check_circle_outline : Icons.warning_amber_rounded,
                   color: Colors.white, size: 14),
                 const SizedBox(width: 4),
-                Text(
-                  isWithinTarget ? 'On track' : 'Exceeded',
-                  style: AppTypography.labelMuted.copyWith(color: Colors.white, fontSize: 10),
+                Expanded(
+                  child: Text(
+                    isWithinTarget ? 'On track' : 'Exceeded',
+                    style: AppTypography.labelMuted.copyWith(color: Colors.white, fontSize: 10),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

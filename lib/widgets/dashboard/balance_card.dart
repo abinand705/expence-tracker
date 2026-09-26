@@ -53,10 +53,14 @@ class BalanceCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           if (FeatureFlags.enableTotalBalance)
-            Text(
-              displayStr,
-              style: AppTypography.displayCurrency.copyWith(
-                color: isNegative ? AppColors.errorRed : cs.onSurface,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                displayStr,
+                style: AppTypography.displayCurrency.copyWith(
+                  color: isNegative ? AppColors.errorRed : cs.onSurface,
+                ),
               ),
             )
           else

@@ -34,7 +34,7 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
     // Pre-select confident recommendations attached to an account by default
     _selectionMap = {
       for (final r in widget.recommendations)
-        r.recommendationId: r.accountId != null,
+        if (r.accountId != null) r.recommendationId: true,
     };
   }
 
@@ -90,16 +90,12 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    // Group recommendations by accountId
+    // Filter and group recommendations by accountId
+    final actionableRecs = widget.recommendations.where((r) => r.accountId != null).toList();
     final Map<String, List<AccountPatternRecommendation>> grouped = {};
-    final List<AccountPatternRecommendation> unresolved = [];
 
-    for (final rec in widget.recommendations) {
-      if (rec.accountId != null) {
-        grouped.putIfAbsent(rec.accountId!, () => []).add(rec);
-      } else {
-        unresolved.add(rec);
-      }
+    for (final rec in actionableRecs) {
+      grouped.putIfAbsent(rec.accountId!, () => []).add(rec);
     }
 
     final accountMap = {for (final a in widget.accounts) a.id: a};
@@ -136,10 +132,15 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'New Account Patterns Found',
-                style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
+              Expanded(
+                child: Text(
+                  'New Account Patterns Found',
+                  style: AppTypography.headlineMd.copyWith(color: cs.onSurface),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: AppSpacing.sm),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -147,7 +148,7 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
                   borderRadius: BorderRadius.circular(AppRadius.full),
                 ),
                 child: Text(
-                  '${widget.recommendations.length} found',
+                  '${actionableRecs.length} found',
                   style: AppTypography.labelMuted.copyWith(
                     color: cs.onPrimaryContainer,
                     fontWeight: FontWeight.bold,
@@ -202,7 +203,7 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
             child: ListView(
               shrinkWrap: true,
               children: [
-                // 1. Grouped Account Recommendations
+                // Grouped Account Recommendations
                 for (final entry in grouped.entries) ...[
                   _buildAccountGroupCard(
                     context: context,
@@ -210,12 +211,6 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
                     account: accountMap[entry.key],
                     recommendations: entry.value,
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
-
-                // 2. Unresolved / Needs Review Section
-                if (unresolved.isNotEmpty) ...[
-                  _buildUnresolvedSection(context, cs, unresolved),
                   const SizedBox(height: AppSpacing.md),
                 ],
               ],
@@ -502,84 +497,6 @@ class _AccountPatternReviewSheetState extends State<AccountPatternReviewSheet> {
     );
   }
 
-  Widget _buildUnresolvedSection(
-    BuildContext context,
-    ColorScheme cs,
-    List<AccountPatternRecommendation> unresolved,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.errorContainer.withAlpha(30),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.error.withAlpha(50)),
-      ),
-      padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.help_outline, size: 18, color: cs.error),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                'Needs Review (Unresolved Account)',
-                style: AppTypography.bodyLg.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: cs.error,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'These patterns could not be automatically linked to an existing account. They will not be added to rules without manual assignment.',
-            style: AppTypography.labelMuted.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const Divider(height: 16),
-          for (final rec in unresolved) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  _buildPatternTypeChip(cs, rec.patternType),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          rec.patternValue,
-                          style: AppTypography.bodyMd.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface,
-                          ),
-                        ),
-                        Text(
-                          '${rec.bankName} • ${rec.reason}',
-                          style: AppTypography.labelMuted.copyWith(
-                            color: cs.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      setState(() {
-                        widget.recommendations.remove(rec);
-                      });
-                    },
-                    child: Text('Ignore', style: TextStyle(color: cs.error, fontSize: 12)),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 }
 
 /// Helper function to show the review bottom sheet.
@@ -589,14 +506,15 @@ Future<List<AccountPatternRecommendation>?> showAccountPatternReviewSheet({
   required List<Account> accounts,
   Future<void> Function(List<AccountPatternRecommendation> approved)? onApprove,
 }) {
-  if (recommendations.isEmpty) return Future.value(null);
+  final actionableRecommendations = recommendations.where((r) => r.accountId != null).toList();
+  if (actionableRecommendations.isEmpty) return Future.value(null);
 
   return showModalBottomSheet<List<AccountPatternRecommendation>>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: (_) => AccountPatternReviewSheet(
-      recommendations: recommendations,
+      recommendations: actionableRecommendations,
       accounts: accounts,
       onApprove: onApprove,
     ),
