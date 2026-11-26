@@ -162,6 +162,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       BudgetsScreen(
         transactions: _transactions,
         onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
+        firestoreService: _firestoreService,
+        authController: widget.authController,
       ),
     ];
 

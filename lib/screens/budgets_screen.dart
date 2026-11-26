@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../controllers/auth_controller.dart';
+import '../models/category_item.dart';
 import '../models/transaction_item.dart';
+import '../services/firestore_service.dart';
 
 class BudgetLimit {
   final String category;
@@ -10,18 +14,24 @@ class BudgetLimit {
 }
 
 class CategoryBadgeData {
+  String id;
   String name;
   IconData icon;
   Color bgColor;
   Color borderColor;
   Color textColor;
+  bool isPredefined;
+  String userId;
 
   CategoryBadgeData({
+    required this.id,
     required this.name,
     required this.icon,
     required this.bgColor,
     required this.borderColor,
     required this.textColor,
+    this.isPredefined = false,
+    this.userId = 'all',
   });
 }
 
@@ -126,11 +136,15 @@ const List<IconData> kCategoryIcons = [
 class BudgetsScreen extends StatefulWidget {
   final List<TransactionItem> transactions;
   final VoidCallback? onOpenDrawer;
+  final FirestoreService? firestoreService;
+  final AuthController? authController;
 
   const BudgetsScreen({
     super.key,
     required this.transactions,
     this.onOpenDrawer,
+    this.firestoreService,
+    this.authController,
   });
 
   @override
@@ -141,126 +155,89 @@ class _BudgetsScreenState extends State<BudgetsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<BudgetLimit> _budgets = [];
+  late final FirestoreService _firestoreService;
+  StreamSubscription<List<CategoryItem>>? _categoriesSub;
 
-  final List<CategoryBadgeData> _expenseCategories = [
-    CategoryBadgeData(
-      name: 'Food & Dining',
-      icon: Icons.restaurant_outlined,
-      bgColor: const Color(0xFFFFF2E8),
-      borderColor: const Color(0xFFFFD8BF),
-      textColor: const Color(0xFFD46B08),
-    ),
-    CategoryBadgeData(
-      name: 'Groceries',
-      icon: Icons.shopping_cart_outlined,
-      bgColor: const Color(0xFFE6FFFB),
-      borderColor: const Color(0xFFB5F5EC),
-      textColor: const Color(0xFF08979C),
-    ),
-    CategoryBadgeData(
-      name: 'Transportation',
-      icon: Icons.directions_car_outlined,
-      bgColor: const Color(0xFFE6F7FF),
-      borderColor: const Color(0xFFBAE7FF),
-      textColor: const Color(0xFF096DD9),
-    ),
-    CategoryBadgeData(
-      name: 'Shopping',
-      icon: Icons.shopping_bag_outlined,
-      bgColor: const Color(0xFFFFF0F6),
-      borderColor: const Color(0xFFFFD6E7),
-      textColor: const Color(0xFFC41D7F),
-    ),
-    CategoryBadgeData(
-      name: 'Bills & Utilities',
-      icon: Icons.receipt_outlined,
-      bgColor: const Color(0xFFFEFFE6),
-      borderColor: const Color(0xFFFFFFB8),
-      textColor: const Color(0xFFD48806),
-    ),
-    CategoryBadgeData(
-      name: 'Entertainment',
-      icon: Icons.movie_creation_outlined,
-      bgColor: const Color(0xFFF9F0FF),
-      borderColor: const Color(0xFFEFDBFF),
-      textColor: const Color(0xFF531DAB),
-    ),
-    CategoryBadgeData(
-      name: 'Healthcare',
-      icon: Icons.medical_services_outlined,
-      bgColor: const Color(0xFFFFF1F0),
-      borderColor: const Color(0xFFFFA39E),
-      textColor: const Color(0xFFCF1322),
-    ),
-    CategoryBadgeData(
-      name: 'Education',
-      icon: Icons.school_outlined,
-      bgColor: const Color(0xFFE6FFFB),
-      borderColor: const Color(0xFF87E8DE),
-      textColor: const Color(0xFF006D75),
-    ),
-    CategoryBadgeData(
-      name: 'Travel',
-      icon: Icons.flight_outlined,
-      bgColor: const Color(0xFFE6FFFA),
-      borderColor: const Color(0xFFA7F3D0),
-      textColor: const Color(0xFF0D9488),
-    ),
-    CategoryBadgeData(
-      name: 'Other Expense',
-      icon: Icons.more_horiz,
-      bgColor: const Color(0xFFF5F5F5),
-      borderColor: const Color(0xFFD9D9D9),
-      textColor: const Color(0xFF595959),
-    ),
-  ];
-
-  final List<CategoryBadgeData> _incomeCategories = [
-    CategoryBadgeData(
-      name: 'Salary',
-      icon: Icons.payments_outlined,
-      bgColor: const Color(0xFFF6FFED),
-      borderColor: const Color(0xFFB7EB8F),
-      textColor: const Color(0xFF389E0D),
-    ),
-    CategoryBadgeData(
-      name: 'Freelance & Business',
-      icon: Icons.business_center_outlined,
-      bgColor: const Color(0xFFF0F5FF),
-      borderColor: const Color(0xFFADC6FF),
-      textColor: const Color(0xFF1D39C4),
-    ),
-    CategoryBadgeData(
-      name: 'Investments',
-      icon: Icons.trending_up_outlined,
-      bgColor: const Color(0xFFF9F0FF),
-      borderColor: const Color(0xFFD3ADF7),
-      textColor: const Color(0xFF722ED1),
-    ),
-    CategoryBadgeData(
-      name: 'Gifts & Allowance',
-      icon: Icons.card_giftcard_outlined,
-      bgColor: const Color(0xFFFFF0F6),
-      borderColor: const Color(0xFFFFADD2),
-      textColor: const Color(0xFFEB2F96),
-    ),
-    CategoryBadgeData(
-      name: 'Other Income',
-      icon: Icons.savings_outlined,
-      bgColor: const Color(0xFFFFFBE6),
-      borderColor: const Color(0xFFFFE58F),
-      textColor: const Color(0xFFD48806),
-    ),
-  ];
+  final List<CategoryBadgeData> _expenseCategories = [];
+  final List<CategoryBadgeData> _incomeCategories = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _firestoreService = widget.firestoreService ?? FirestoreService();
+    _loadPredefinedCategories();
+    _subscribeToCategories();
+    widget.authController?.addListener(_onAuthChanged);
+  }
+
+  void _onAuthChanged() {
+    _subscribeToCategories();
+  }
+
+  void _loadPredefinedCategories() {
+    _expenseCategories.clear();
+    _incomeCategories.clear();
+    for (final item in CategoryItem.predefinedCategories) {
+      final badge = _itemToBadge(item);
+      if (item.subcategory == 'expense') {
+        _expenseCategories.add(badge);
+      } else {
+        _incomeCategories.add(badge);
+      }
+    }
+  }
+
+  void _subscribeToCategories() {
+    _categoriesSub?.cancel();
+    final userId = widget.authController?.userId ?? 'guest_user';
+    _categoriesSub = _firestoreService.streamCategories(userId).listen((items) {
+      if (!mounted) return;
+      setState(() {
+        _expenseCategories.clear();
+        _incomeCategories.clear();
+        for (final item in items) {
+          final badge = _itemToBadge(item);
+          if (item.subcategory == 'expense') {
+            _expenseCategories.add(badge);
+          } else {
+            _incomeCategories.add(badge);
+          }
+        }
+      });
+    });
+  }
+
+  CategoryBadgeData _itemToBadge(CategoryItem item) {
+    final bgColor = CategoryItem.hexToColor(item.colour);
+    CategoryColorTheme? matchedTheme;
+    for (final theme in kCategoryColorThemes) {
+      if (theme.bgColor.toARGB32() == bgColor.toARGB32()) {
+        matchedTheme = theme;
+        break;
+      }
+    }
+
+    final borderColor =
+        matchedTheme?.borderColor ?? bgColor.withValues(alpha: 0.8);
+    final textColor = matchedTheme?.textColor ?? const Color(0xFF1E293B);
+
+    return CategoryBadgeData(
+      id: item.id,
+      name: item.name,
+      icon: CategoryItem.iconFromString(item.icon),
+      bgColor: bgColor,
+      borderColor: borderColor,
+      textColor: textColor,
+      isPredefined: item.isPredefined,
+      userId: item.userId,
+    );
   }
 
   @override
   void dispose() {
+    widget.authController?.removeListener(_onAuthChanged);
+    _categoriesSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -582,12 +559,20 @@ class _BudgetsScreenState extends State<BudgetsScreen>
                   final name = nameController.text.trim();
                   if (name.isEmpty) return;
 
+                  final categoryId = isEditing
+                      ? targetList[existingIndex].id
+                      : 'cat_${DateTime.now().millisecondsSinceEpoch}';
+                  final userId = widget.authController?.userId ?? 'guest_user';
+
                   final newBadge = CategoryBadgeData(
+                    id: categoryId,
                     name: name,
                     icon: selectedIcon,
                     bgColor: selectedTheme.bgColor,
                     borderColor: selectedTheme.borderColor,
                     textColor: selectedTheme.textColor,
+                    isPredefined: false,
+                    userId: userId,
                   );
 
                   setState(() {
@@ -597,6 +582,18 @@ class _BudgetsScreenState extends State<BudgetsScreen>
                       targetList.add(newBadge);
                     }
                   });
+
+                  // Persist to Firestore categories collection
+                  final categoryItem = CategoryItem(
+                    id: categoryId,
+                    name: name,
+                    subcategory: isExpense ? 'expense' : 'income',
+                    icon: CategoryItem.stringFromIcon(selectedIcon),
+                    colour: CategoryItem.colorToHex(selectedTheme.bgColor),
+                    userId: userId,
+                    isPredefined: false,
+                  );
+                  _firestoreService.saveCategory(categoryItem);
 
                   Navigator.of(ctx).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -710,9 +707,14 @@ class _BudgetsScreenState extends State<BudgetsScreen>
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
+              final item = list[index];
               setState(() {
                 list.removeAt(index);
               });
+              _firestoreService.deleteCategory(
+                item.id,
+                isExpense ? 'expense' : 'income',
+              );
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Deleted "${item.name}"'),

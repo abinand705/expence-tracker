@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../services/firestore_service.dart';
 
 class AuthController extends ChangeNotifier {
   final FirebaseAuth? _auth;
+  final FirestoreService _firestoreService;
   StreamSubscription<User?>? _authSubscription;
 
   User? _currentUser;
@@ -17,15 +20,19 @@ class AuthController extends ChangeNotifier {
 
   AuthController({
     FirebaseAuth? auth,
+    FirestoreService? firestoreService,
     bool initialLoggedIn = false,
     String? initialName,
     String? initialEmail,
   })  : _auth = auth ?? _resolveAuth(),
+        _firestoreService = firestoreService ?? FirestoreService(),
         _fallbackIsLoggedIn = initialLoggedIn,
         _fallbackUserName = initialName,
         _fallbackUserEmail = initialEmail {
     _initAuthListener();
   }
+
+  FirestoreService get firestoreService => _firestoreService;
 
   static FirebaseAuth? _resolveAuth() {
     try {
@@ -89,6 +96,11 @@ class AuthController extends ChangeNotifier {
           ? name.trim()
           : _extractNameFromEmail(cleanEmail);
       _isGuest = false;
+      await _firestoreService.saveUserData(
+        userId: _fallbackUserId!,
+        username: _fallbackUserName!,
+        emailId: _fallbackUserEmail!,
+      );
       notifyListeners();
       return null;
     }
@@ -100,6 +112,24 @@ class AuthController extends ChangeNotifier {
       );
       _currentUser = cred.user;
       _isGuest = false;
+
+      final uid = _currentUser?.uid ?? cred.user?.uid ?? '';
+      if (uid.isNotEmpty) {
+        final existing = await _firestoreService.getUserData(uid);
+        if (existing == null) {
+          final displayName = _currentUser?.displayName ??
+              (name != null && name.trim().isNotEmpty
+                  ? name.trim()
+                  : _extractNameFromEmail(cleanEmail));
+          await _firestoreService.saveUserData(
+            userId: uid,
+            username: displayName,
+            emailId: cleanEmail,
+          );
+        }
+        await _firestoreService.seedPredefinedCategories();
+      }
+
       notifyListeners();
       return null;
     } on FirebaseAuthException catch (e) {
@@ -125,6 +155,12 @@ class AuthController extends ChangeNotifier {
       _fallbackUserName = cleanName;
       _fallbackUserEmail = cleanEmail;
       _isGuest = false;
+      await _firestoreService.saveUserData(
+        userId: _fallbackUserId!,
+        username: cleanName,
+        emailId: cleanEmail,
+      );
+      await _firestoreService.seedPredefinedCategories();
       notifyListeners();
       return null;
     }
@@ -138,6 +174,17 @@ class AuthController extends ChangeNotifier {
       await cred.user?.reload();
       _currentUser = _auth.currentUser;
       _isGuest = false;
+
+      final uid = _currentUser?.uid ?? cred.user?.uid ?? '';
+      if (uid.isNotEmpty) {
+        await _firestoreService.saveUserData(
+          userId: uid,
+          username: cleanName,
+          emailId: cleanEmail,
+        );
+        await _firestoreService.seedPredefinedCategories();
+      }
+
       notifyListeners();
       return null;
     } on FirebaseAuthException catch (e) {
@@ -145,6 +192,73 @@ class AuthController extends ChangeNotifier {
       return _getReadableErrorMessage(e);
     } catch (e) {
       return 'Registration failed. Please try again.';
+    }
+  }
+
+  Future<String?> signInWithGoogle() async {
+    if (_auth == null) {
+      _fallbackIsLoggedIn = true;
+      _fallbackUserId = 'google_${DateTime.now().millisecondsSinceEpoch}';
+      _fallbackUserName = 'Google User';
+      _fallbackUserEmail = 'user@gmail.com';
+      _isGuest = false;
+      await _firestoreService.saveUserData(
+        userId: _fallbackUserId!,
+        username: _fallbackUserName!,
+        emailId: _fallbackUserEmail!,
+      );
+      await _firestoreService.seedPredefinedCategories();
+      notifyListeners();
+      return null;
+    }
+
+    try {
+      UserCredential userCredential;
+      if (kIsWeb) {
+        final googleProvider = GoogleAuthProvider();
+        userCredential = await _auth.signInWithPopup(googleProvider);
+      } else {
+        final googleSignIn = GoogleSignIn.instance;
+        await googleSignIn.initialize();
+        final account = await googleSignIn.authenticate();
+        final auth = account.authentication;
+        final credential = GoogleAuthProvider.credential(
+          idToken: auth.idToken,
+        );
+        userCredential = await _auth.signInWithCredential(credential);
+      }
+
+      _currentUser = userCredential.user;
+      _isGuest = false;
+
+      final uid = _currentUser?.uid ?? '';
+      final name = _currentUser?.displayName ??
+          (_currentUser?.email != null
+              ? _extractNameFromEmail(_currentUser!.email!)
+              : 'Google User');
+      final email = _currentUser?.email ?? '';
+
+      if (uid.isNotEmpty) {
+        await _firestoreService.saveUserData(
+          userId: uid,
+          username: name,
+          emailId: email,
+        );
+        await _firestoreService.seedPredefinedCategories();
+      }
+
+      notifyListeners();
+      return null;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Google Sign-In Error: ${e.code} - ${e.message}');
+      return _getReadableErrorMessage(e);
+    } catch (e) {
+      debugPrint('Google Sign-In Error: $e');
+      if (e is GoogleSignInException &&
+          e.code == GoogleSignInExceptionCode.canceled) {
+        return null;
+      }
+      return 'Google Sign-In failed. Please try again.';
     }
   }
 

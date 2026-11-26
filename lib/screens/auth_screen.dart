@@ -151,6 +151,37 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    final error = await widget.authController.signInWithGoogle();
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: const Color(0xFFDC2626),
+        ),
+      );
+      return;
+    }
+
+    final name = widget.authController.userName ?? 'Google User';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Signed in as $name'),
+        backgroundColor: const Color(0xFF16A34A),
+      ),
+    );
+
+    if (widget.onAuthSuccess != null) {
+      widget.onAuthSuccess!();
+    } else if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -522,6 +553,73 @@ class _AuthScreenState extends State<AuthScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                ),
+                const SizedBox(height: 16),
+
+                // Divider with "OR"
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: borderColor, height: 1)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: secondaryTextColor,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: borderColor, height: 1)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Sign in with Google Button
+                OutlinedButton(
+                  onPressed: _isLoading ? null : _signInWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: borderColor, width: 1.2),
+                    backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isDark ? Colors.white : const Color(0xFFF1F5F9),
+                        ),
+                        child: const Text(
+                          'G',
+                          style: TextStyle(
+                            color: Color(0xFF4285F4),
+                            fontWeight: FontWeight.w900,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        _isRegister ? 'Sign up with Google' : 'Sign in with Google',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: textColor,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 

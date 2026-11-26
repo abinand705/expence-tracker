@@ -44,8 +44,9 @@ class _MoneyTrackAppState extends State<MoneyTrackApp> {
   void initState() {
     super.initState();
     _themeController = widget.themeController ?? ThemeController();
-    _authController = widget.authController ?? AuthController();
     _firestoreService = widget.firestoreService ?? FirestoreService();
+    _authController = widget.authController ??
+        AuthController(firestoreService: _firestoreService);
   }
 
   @override
