@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
+import '../screens/auth_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   final int selectedIndex;
@@ -292,10 +293,15 @@ class AppDrawer extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogCtx);
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
               authController?.logout();
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => AuthScreen(
+                    authController: authController ?? AuthController(),
+                  ),
+                ),
+                (route) => false,
+              );
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Signed out successfully')),
               );

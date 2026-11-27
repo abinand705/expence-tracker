@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shake/shake.dart';
 import '../controllers/auth_controller.dart';
 import '../models/transaction_item.dart';
 import '../services/firestore_service.dart';
@@ -30,7 +31,8 @@ class MainNavigationScreen extends StatefulWidget {
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
+class _MainNavigationScreenState extends State<MainNavigationScreen>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentIndex = 0;
   final List<TransactionItem> _transactions = [];
@@ -38,13 +40,40 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   late final FirestoreService _firestoreService;
   StreamSubscription<List<TransactionItem>>? _transactionsSub;
   String? _lastUserId;
+  ShakeDetector? _shakeDetector;
+  bool _isAddSheetOpen = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _firestoreService = widget.firestoreService ?? FirestoreService();
     _subscribeToUserTransactions();
+    _initShakeDetector();
     widget.authController?.addListener(_onAuthChanged);
+  }
+
+  void _initShakeDetector() {
+    try {
+      _shakeDetector = ShakeDetector.autoStart(
+        onPhoneShake: (_) {
+          if (!mounted || _isAddSheetOpen) return;
+          _openAddTransactionSheet(TransactionType.expense);
+        },
+        shakeThresholdGravity: 2.7,
+      );
+    } catch (e) {
+      debugPrint('Shake detector notice: $e');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      try {
+        _shakeDetector?.startListening();
+      } catch (_) {}
+    }
   }
 
   void _onAuthChanged() {
@@ -70,12 +99,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    try {
+      _shakeDetector?.stopListening();
+    } catch (_) {}
     widget.authController?.removeListener(_onAuthChanged);
     _transactionsSub?.cancel();
     super.dispose();
   }
 
   void _openAddTransactionSheet(TransactionType type) {
+    if (_isAddSheetOpen) return;
+    _isAddSheetOpen = true;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -100,7 +136,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           }
         },
       ),
-    );
+    ).whenComplete(() {
+      _isAddSheetOpen = false;
+    });
   }
 
   void _deleteTransaction(String id) {

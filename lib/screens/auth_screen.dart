@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
+import 'main_navigation_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   final AuthController authController;
@@ -131,10 +132,23 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
 
+    _navigateAfterAuth();
+  }
+
+  void _navigateAfterAuth() {
     if (widget.onAuthSuccess != null) {
       widget.onAuthSuccess!();
     } else if (Navigator.canPop(context)) {
       Navigator.pop(context);
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MainNavigationScreen(
+            authController: widget.authController,
+          ),
+        ),
+      );
     }
   }
 
@@ -144,11 +158,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (!mounted) return;
     setState(() => _isLoading = false);
 
-    if (widget.onAuthSuccess != null) {
-      widget.onAuthSuccess!();
-    } else if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    _navigateAfterAuth();
   }
 
   Future<void> _signInWithGoogle() async {
@@ -167,6 +177,11 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
+    if (!widget.authController.isLoggedIn) {
+      // User cancelled sign in
+      return;
+    }
+
     final name = widget.authController.userName ?? 'Google User';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -175,11 +190,7 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
     );
 
-    if (widget.onAuthSuccess != null) {
-      widget.onAuthSuccess!();
-    } else if (Navigator.canPop(context)) {
-      Navigator.pop(context);
-    }
+    _navigateAfterAuth();
   }
 
   @override

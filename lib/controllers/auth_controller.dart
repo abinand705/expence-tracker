@@ -5,6 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../services/firestore_service.dart';
 
 class AuthController extends ChangeNotifier {
+  static const String googleServerClientId =
+      '1055628015860-vjq1noscfs4r8hh1tjaglpiki78eu855.apps.googleusercontent.com';
+
   final FirebaseAuth? _auth;
   final FirestoreService _firestoreService;
   StreamSubscription<User?>? _authSubscription;
@@ -219,9 +222,14 @@ class AuthController extends ChangeNotifier {
         userCredential = await _auth.signInWithPopup(googleProvider);
       } else {
         final googleSignIn = GoogleSignIn.instance;
-        await googleSignIn.initialize();
+        await googleSignIn.initialize(
+          serverClientId: googleServerClientId,
+        );
         final account = await googleSignIn.authenticate();
         final auth = account.authentication;
+        if (auth.idToken == null || auth.idToken!.isEmpty) {
+          return 'Failed to obtain Google ID token. Please try again.';
+        }
         final credential = GoogleAuthProvider.credential(
           idToken: auth.idToken,
         );
@@ -258,7 +266,14 @@ class AuthController extends ChangeNotifier {
           e.code == GoogleSignInExceptionCode.canceled) {
         return null;
       }
-      return 'Google Sign-In failed. Please try again.';
+      final errorStr = e.toString();
+      if (errorStr.contains('canceled') || errorStr.contains('cancelled')) {
+        return null;
+      }
+      if (errorStr.contains('10') || errorStr.contains('DEVELOPER_ERROR')) {
+        return 'Google Sign-In setup error (Code 10). Please ensure debug keystore SHA-1 is added in Firebase Console.';
+      }
+      return 'Google Sign-In failed: $e';
     }
   }
 
@@ -287,6 +302,11 @@ class AuthController extends ChangeNotifier {
       } catch (e) {
         debugPrint('Firebase SignOut Error: $e');
       }
+      try {
+        if (!kIsWeb) {
+          await GoogleSignIn.instance.signOut();
+        }
+      } catch (_) {}
     }
     _currentUser = null;
     _isGuest = false;

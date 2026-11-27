@@ -3,6 +3,7 @@ import '../controllers/auth_controller.dart';
 import '../models/transaction_item.dart';
 import '../theme/app_theme.dart';
 import '../widgets/add_transaction_sheet.dart';
+import 'auth_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final ThemeController? themeController;
@@ -182,7 +183,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               widget.authController?.logout();
-              if (mounted) setState(() {});
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => AuthScreen(
+                    authController: widget.authController ?? AuthController(),
+                  ),
+                ),
+                (route) => false,
+              );
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Signed out successfully')),
               );

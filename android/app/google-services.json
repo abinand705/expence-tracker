@@ -12,7 +12,20 @@
           "package_name": "com.aes.moneytrack"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1055628015860-dbn2bf7ooo34barhh9pf438vj1ohpjhb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aes.moneytrack",
+            "certificate_hash": "a4d0449939db63943637bbd6688dacf232207dce"
+          }
+        },
+        {
+          "client_id": "1055628015860-vjq1noscfs4r8hh1tjaglpiki78eu855.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDflzFdpZ7bMc0QiKOovUDR6w5Cmfj22rI"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1055628015860-vjq1noscfs4r8hh1tjaglpiki78eu855.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1055628015860-3rhesjcn4d8jmp8rfpkvf8ie3gvm0n8s.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.moneyTrack"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +56,20 @@
           "package_name": "com.example.money_track"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1055628015860-9gqo0euf937ab208nsnlpsq3dt6t0lok.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.money_track",
+            "certificate_hash": "a4d0449939db63943637bbd6688dacf232207dce"
+          }
+        },
+        {
+          "client_id": "1055628015860-vjq1noscfs4r8hh1tjaglpiki78eu855.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDflzFdpZ7bMc0QiKOovUDR6w5Cmfj22rI"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1055628015860-vjq1noscfs4r8hh1tjaglpiki78eu855.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1055628015860-3rhesjcn4d8jmp8rfpkvf8ie3gvm0n8s.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.moneyTrack"
+              }
+            }
+          ]
         }
       }
     }

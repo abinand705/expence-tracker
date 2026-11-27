@@ -176,6 +176,13 @@ class FirestoreService {
     if (_firestore == null) return;
     try {
       final batch = _firestore.batch();
+
+      // Ensure categories/expense and categories/income parent documents exist with metadata
+      final expDoc = _firestore.collection('categories').doc('expense');
+      batch.set(expDoc, {'type': 'expense', 'title': 'Expense Categories'}, SetOptions(merge: true));
+      final incDoc = _firestore.collection('categories').doc('income');
+      batch.set(incDoc, {'type': 'income', 'title': 'Income Categories'}, SetOptions(merge: true));
+
       for (final cat in CategoryItem.predefinedCategories) {
         final docRef = _firestore.collection('categories').doc(cat.id);
         batch.set(docRef, cat.toMap(), SetOptions(merge: true));
@@ -238,6 +245,12 @@ class FirestoreService {
     if (_firestore == null) return;
 
     try {
+      // Ensure parent document exists
+      await _firestore.collection('categories').doc(category.subcategory).set({
+        'type': category.subcategory,
+        'title': '${category.subcategory[0].toUpperCase()}${category.subcategory.substring(1)} Categories',
+      }, SetOptions(merge: true));
+
       await _firestore
           .collection('categories')
           .doc(category.id)

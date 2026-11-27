@@ -252,10 +252,11 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Sign Out'));
     await tester.pumpAndSettle();
 
-    // Verify signed out: drawer header shows Sign In / Register
-    await tester.tap(find.byIcon(Icons.menu).first);
-    await tester.pumpAndSettle();
+    // Verify signed out: login page is shown directly, NOT the homepage
+    expect(find.text('Welcome Back'), findsOneWidget);
+    expect(find.text('Sign In'), findsWidgets);
+    expect(find.text('TOTAL BALANCE'), findsNothing);
+    expect(find.text('CASH FLOW (THIS MONTH)'), findsNothing);
     expect(find.text('Test User'), findsNothing);
-    expect(find.text('Sign In / Register'), findsWidgets);
   });
 }
