@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import '../models/budget_item.dart';
 import '../models/category_item.dart';
 import '../models/transaction_item.dart';
 
@@ -10,10 +11,13 @@ class FirestoreService {
   final Map<String, Map<String, dynamic>> _localUsersFallback = {};
   final List<CategoryItem> _localCategoriesFallback =
       List.from(CategoryItem.predefinedCategories);
+  final List<BudgetItem> _localBudgetsFallback = [];
   final _fallbackController =
       StreamController<List<TransactionItem>>.broadcast();
   final _categoriesFallbackController =
       StreamController<List<CategoryItem>>.broadcast();
+  final _budgetsFallbackController =
+      StreamController<List<BudgetItem>>.broadcast();
 
   FirestoreService({FirebaseFirestore? firestore})
       : _firestore = firestore ?? _resolveFirestore() {
@@ -36,14 +40,16 @@ class FirestoreService {
     return _firestore.collection('users').doc(userId).collection('transactions');
   }
 
-  Stream<List<TransactionItem>> streamTransactions(String userId) {
+  Stream<List<TransactionItem>> streamTransactions(String userId) async* {
     final ref = _userTransactionsRef(userId);
     if (ref == null) {
       // In-memory fallback stream for test/offline environments
-      return _fallbackController.stream;
+      yield List.from(_localFallback);
+      yield* _fallbackController.stream;
+      return;
     }
 
-    return ref
+    yield* ref
         .orderBy('date', descending: true)
         .snapshots()
         .map((snapshot) {
@@ -63,7 +69,15 @@ class FirestoreService {
     }
 
     try {
-      await ref.doc(item.id).set(item.toMap(), SetOptions(merge: true));
+      final mapData = item.toMap(userId: userId);
+      await ref.doc(item.id).set(mapData, SetOptions(merge: true));
+
+      if (_firestore != null) {
+        await _firestore
+            .collection('transactions')
+            .doc(item.id)
+            .set(mapData, SetOptions(merge: true));
+      }
     } catch (e) {
       debugPrint('Error saving transaction to Firestore: $e');
       rethrow;
@@ -80,6 +94,12 @@ class FirestoreService {
 
     try {
       await ref.doc(transactionId).delete();
+      if (_firestore != null) {
+        await _firestore
+            .collection('transactions')
+            .doc(transactionId)
+            .delete();
+      }
     } catch (e) {
       debugPrint('Error deleting transaction from Firestore: $e');
       rethrow;
@@ -187,9 +207,10 @@ class FirestoreService {
       return;
     }
 
+    final targetUserIds = {'all', if (userId.isNotEmpty) userId}.toList();
     final query = _firestore
         .collection('categories')
-        .where('user_Id', whereIn: ['all', userId]);
+        .where('user_Id', whereIn: targetUserIds);
 
     yield* query.snapshots().map((snapshot) {
       final loaded = snapshot.docs
@@ -255,8 +276,90 @@ class FirestoreService {
     }
   }
 
+  /// Streams user's category budgets from the "budgets" collection
+  Stream<List<BudgetItem>> streamBudgets(String userId) async* {
+    if (_firestore == null) {
+      yield _localBudgetsFallback
+          .where((b) => b.userId == 'all' || b.userId == userId)
+          .toList();
+      yield* _budgetsFallbackController.stream.map(
+        (list) =>
+            list.where((b) => b.userId == 'all' || b.userId == userId).toList(),
+      );
+      return;
+    }
+
+    final targetUserIds = {'all', if (userId.isNotEmpty) userId}.toList();
+    final query = _firestore
+        .collection('budgets')
+        .where('user_Id', whereIn: targetUserIds);
+
+    yield* query.snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => BudgetItem.fromMap(doc.id, doc.data()))
+          .toList();
+    });
+  }
+
+  /// Saves a budget document to Firestore with fields:
+  /// "category/expense_name", "monthly_limit" (integer), and "user_Id"
+  Future<void> saveBudget(BudgetItem budget) async {
+    _localBudgetsFallback.removeWhere((b) =>
+        b.id == budget.id ||
+        (b.userId == budget.userId && b.categoryName == budget.categoryName));
+    _localBudgetsFallback.add(budget);
+    _budgetsFallbackController.add(List.from(_localBudgetsFallback));
+
+    if (_firestore == null) return;
+
+    try {
+      // Top-level "budgets" collection
+      await _firestore
+          .collection('budgets')
+          .doc(budget.id)
+          .set(budget.toMap(), SetOptions(merge: true));
+
+      // Also persist to user's subcollection for consistency
+      if (budget.userId.isNotEmpty && budget.userId != 'all') {
+        await _firestore
+            .collection('users')
+            .doc(budget.userId)
+            .collection('budgets')
+            .doc(budget.id)
+            .set(budget.toMap(), SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint('Error saving budget to Firestore: $e');
+      rethrow;
+    }
+  }
+
+  /// Deletes a budget document from Firestore
+  Future<void> deleteBudget(String budgetId, {String? userId}) async {
+    _localBudgetsFallback.removeWhere((b) => b.id == budgetId);
+    _budgetsFallbackController.add(List.from(_localBudgetsFallback));
+
+    if (_firestore == null) return;
+
+    try {
+      await _firestore.collection('budgets').doc(budgetId).delete();
+      if (userId != null && userId.isNotEmpty && userId != 'all') {
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('budgets')
+            .doc(budgetId)
+            .delete();
+      }
+    } catch (e) {
+      debugPrint('Error deleting budget from Firestore: $e');
+      rethrow;
+    }
+  }
+
   void dispose() {
     _fallbackController.close();
     _categoriesFallbackController.close();
+    _budgetsFallbackController.close();
   }
 }

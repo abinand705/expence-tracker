@@ -1,14 +1,23 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../controllers/auth_controller.dart';
+import '../models/category_item.dart';
 import '../models/transaction_item.dart';
+import '../services/firestore_service.dart';
 
 class AddTransactionSheet extends StatefulWidget {
   final TransactionType initialType;
   final Function(TransactionItem) onAdd;
+  final FirestoreService? firestoreService;
+  final AuthController? authController;
 
   const AddTransactionSheet({
     super.key,
     required this.initialType,
     required this.onAdd,
+    this.firestoreService,
+    this.authController,
   });
 
   @override
@@ -17,71 +26,130 @@ class AddTransactionSheet extends StatefulWidget {
 
 class _AddTransactionSheetState extends State<AddTransactionSheet> {
   late TransactionType _selectedType;
-  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _noteController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  String _selectedCategory = 'General';
+  String _selectedCategory = '';
 
-  final List<String> _expenseCategories = [
-    'General',
-    'Food & Dining',
-    'Shopping',
-    'Groceries',
-    'Transportation',
-    'Bills & Utilities',
-    'Entertainment',
-  ];
+  late final FirestoreService _firestoreService;
+  StreamSubscription<List<CategoryItem>>? _categoriesSub;
 
-  final List<String> _incomeCategories = [
-    'Salary',
-    'Freelance',
-    'Investment',
-    'Business',
-    'Gifts',
-    'Other',
-  ];
+  List<String> _expenseCategories = [];
+  List<String> _incomeCategories = [];
 
   @override
   void initState() {
     super.initState();
     _selectedType = widget.initialType;
-    _selectedCategory = _selectedType == TransactionType.income
-        ? _incomeCategories.first
-        : _expenseCategories.first;
+    _firestoreService = widget.firestoreService ?? FirestoreService();
+
+    // Default predefined categories while streaming
+    _expenseCategories = [
+      'General',
+      ...CategoryItem.predefinedCategories
+          .where((c) => c.subcategory == 'expense')
+          .map((c) => c.name)
+          .where((n) => n != 'General'),
+    ];
+
+    _incomeCategories = CategoryItem.predefinedCategories
+        .where((c) => c.subcategory == 'income')
+        .map((c) => c.name)
+        .toList();
+
+    _updateDefaultCategoryForType();
+    _subscribeToCategories();
+  }
+
+  void _updateDefaultCategoryForType() {
+    if (_selectedType == TransactionType.income) {
+      if (_incomeCategories.isNotEmpty) {
+        _selectedCategory = _incomeCategories.first;
+      }
+    } else if (_selectedType == TransactionType.expense) {
+      _selectedCategory = _expenseCategories.contains('General')
+          ? 'General'
+          : (_expenseCategories.isNotEmpty ? _expenseCategories.first : 'General');
+    } else {
+      _selectedCategory = 'Transfer';
+    }
+  }
+
+  void _subscribeToCategories() {
+    _categoriesSub?.cancel();
+    final userId = widget.authController?.userId ?? 'guest_user';
+    _categoriesSub = _firestoreService.streamCategories(userId).listen((items) {
+      if (!mounted) return;
+      final expenses = [
+        'General',
+        ...items
+            .where((c) => c.subcategory == 'expense')
+            .map((c) => c.name)
+            .where((n) => n != 'General')
+            .toSet(),
+      ];
+
+      final incomes = items
+          .where((c) => c.subcategory == 'income')
+          .map((c) => c.name)
+          .toSet()
+          .toList();
+
+      setState(() {
+        if (expenses.isNotEmpty) _expenseCategories = expenses;
+        if (incomes.isNotEmpty) _incomeCategories = incomes;
+
+        final currentList = _selectedType == TransactionType.income
+            ? _incomeCategories
+            : _expenseCategories;
+
+        if (!currentList.contains(_selectedCategory) && currentList.isNotEmpty) {
+          _selectedCategory = currentList.first;
+        }
+      });
+    });
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
+    _categoriesSub?.cancel();
+    _noteController.dispose();
     _amountController.dispose();
     super.dispose();
   }
 
   void _submit() {
     final amountText = _amountController.text.trim();
-    final amount = double.tryParse(amountText);
+    final amountInt = int.tryParse(amountText) ??
+        (double.tryParse(amountText)?.round());
 
-    if (amount == null || amount <= 0) {
+    if (amountInt == null || amountInt <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid amount')),
       );
       return;
     }
 
-    final title = _titleController.text.trim().isEmpty
-        ? (_selectedType == TransactionType.transfer
-            ? 'Account Transfer'
-            : _selectedCategory)
-        : _titleController.text.trim();
+    final enteredNote = _noteController.text.trim();
+    final note = enteredNote.isNotEmpty
+        ? enteredNote
+        : (_selectedType == TransactionType.transfer
+            ? 'Transfer'
+            : _selectedCategory);
+
+    final now = DateTime.now();
+    final category = _selectedType == TransactionType.transfer
+        ? 'Transfer'
+        : _selectedCategory;
 
     final item = TransactionItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: title,
-      amount: amount,
+      id: 'tx_${now.millisecondsSinceEpoch}',
+      title: note,
+      note: note,
+      amount: amountInt.toDouble(),
       type: _selectedType,
-      date: DateTime.now(),
-      category: _selectedType == TransactionType.transfer
-          ? 'Transfer'
-          : _selectedCategory,
+      date: now,
+      category: category,
+      userId: widget.authController?.userId,
     );
 
     widget.onAdd(item);
@@ -92,11 +160,14 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
-    final inputBgColor = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
-    final actionButtonColor = isDark ? const Color(0xFF165945) : const Color(0xFF0A3026);
+    final inputBgColor =
+        isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final borderColor =
+        isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final actionButtonColor =
+        isDark ? const Color(0xFF165945) : const Color(0xFF0A3026);
 
-    final categories = _selectedType == TransactionType.income
+    final currentCategories = _selectedType == TransactionType.income
         ? _incomeCategories
         : _expenseCategories;
 
@@ -127,7 +198,10 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.close, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                icon: Icon(Icons.close,
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -142,18 +216,23 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
             ),
             child: Row(
               children: [
-                _buildTypeButton(TransactionType.expense, 'Expense', const Color(0xFFDC2626), isDark),
-                _buildTypeButton(TransactionType.income, 'Income', const Color(0xFF16A34A), isDark),
-                _buildTypeButton(TransactionType.transfer, 'Transfer', const Color(0xFF2563EB), isDark),
+                _buildTypeButton(TransactionType.expense, 'Expense',
+                    const Color(0xFFDC2626), isDark),
+                _buildTypeButton(TransactionType.income, 'Income',
+                    const Color(0xFF16A34A), isDark),
+                _buildTypeButton(TransactionType.transfer, 'Transfer',
+                    const Color(0xFF2563EB), isDark),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          // Amount input
+          // Amount input (Integer only)
           TextField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+            inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+            style: TextStyle(
+                fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
             decoration: InputDecoration(
               prefixText: '₹ ',
               prefixStyle: TextStyle(
@@ -162,7 +241,10 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 color: textColor,
               ),
               hintText: '0.00',
-              hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+              hintStyle: TextStyle(
+                  color: isDark
+                      ? const Color(0xFF64748B)
+                      : const Color(0xFF94A3B8)),
               filled: true,
               fillColor: inputBgColor,
               border: OutlineInputBorder(
@@ -176,20 +258,32 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF0A3026),
+                  color: isDark
+                      ? const Color(0xFF34D399)
+                      : const Color(0xFF0A3026),
                   width: 1.5,
                 ),
               ),
             ),
           ),
           const SizedBox(height: 12),
-          // Title / note
+          // Note input
           TextField(
-            controller: _titleController,
+            controller: _noteController,
             style: TextStyle(color: textColor),
             decoration: InputDecoration(
-              hintText: 'Note / Description (Optional)',
-              hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+              labelText: 'Note',
+              labelStyle: TextStyle(
+                  color: isDark
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF64748B)),
+              hintText: _selectedType == TransactionType.transfer
+                  ? 'e.g. Sent to Savings'
+                  : 'e.g. Grocery shopping',
+              hintStyle: TextStyle(
+                  color: isDark
+                      ? const Color(0xFF64748B)
+                      : const Color(0xFF94A3B8)),
               filled: true,
               fillColor: inputBgColor,
               border: OutlineInputBorder(
@@ -203,20 +297,27 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(
-                  color: isDark ? const Color(0xFF34D399) : const Color(0xFF0A3026),
+                  color: isDark
+                      ? const Color(0xFF34D399)
+                      : const Color(0xFF0A3026),
                   width: 1.5,
                 ),
               ),
             ),
           ),
+          // Category dropdown - shown only for expense and income
           if (_selectedType != TransactionType.transfer) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: categories.contains(_selectedCategory) ? _selectedCategory : categories.first,
+              initialValue: currentCategories.contains(_selectedCategory)
+                  ? _selectedCategory
+                  : (currentCategories.isNotEmpty
+                      ? currentCategories.first
+                      : null),
               dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
               style: TextStyle(color: textColor, fontSize: 15),
               iconEnabledColor: textColor,
-              items: categories
+              items: currentCategories
                   .map((cat) => DropdownMenuItem(
                         value: cat,
                         child: Text(cat, style: TextStyle(color: textColor)),
@@ -228,8 +329,13 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
                 }
               },
               decoration: InputDecoration(
-                labelText: 'Category',
-                labelStyle: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                labelText: _selectedType == TransactionType.income
+                    ? 'Income Category'
+                    : 'Expense Category',
+                labelStyle: TextStyle(
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
                 filled: true,
                 fillColor: inputBgColor,
                 border: OutlineInputBorder(
@@ -265,29 +371,29 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
     );
   }
 
-  Widget _buildTypeButton(TransactionType type, String label, Color activeColor, bool isDark) {
+  Widget _buildTypeButton(
+      TransactionType type, String label, Color activeColor, bool isDark) {
     final isSelected = _selectedType == type;
     return Expanded(
       child: GestureDetector(
         onTap: () {
           setState(() {
             _selectedType = type;
-            if (type == TransactionType.income) {
-              _selectedCategory = _incomeCategories.first;
-            } else if (type == TransactionType.expense) {
-              _selectedCategory = _expenseCategories.first;
-            }
+            _updateDefaultCategoryForType();
           });
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? (isDark ? const Color(0xFF1E293B) : Colors.white) : Colors.transparent,
+            color: isSelected
+                ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                      color:
+                          Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),
@@ -300,7 +406,11 @@ class _AddTransactionSheetState extends State<AddTransactionSheet> {
               style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
-                color: isSelected ? activeColor : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                color: isSelected
+                    ? activeColor
+                    : (isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B)),
               ),
             ),
           ),

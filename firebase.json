@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"moneytrack-78b48","appId":"1:1055628015860:android:435c7ca0aeeabef27786a1","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"moneytrack-78b48","configurations":{"android":"1:1055628015860:android:435c7ca0aeeabef27786a1","ios":"1:1055628015860:ios:9fad29d96a10d5aa7786a1","macos":"1:1055628015860:ios:9fad29d96a10d5aa7786a1","web":"1:1055628015860:web:d45586507dcddd3d7786a1","windows":"1:1055628015860:web:7b0c051d23b798c07786a1"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "moneytrack-78b48",
+          "appId": "1:1055628015860:android:435c7ca0aeeabef27786a1",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "moneytrack-78b48",
+          "configurations": {
+            "android": "1:1055628015860:android:435c7ca0aeeabef27786a1",
+            "ios": "1:1055628015860:ios:9fad29d96a10d5aa7786a1",
+            "macos": "1:1055628015860:ios:9fad29d96a10d5aa7786a1",
+            "web": "1:1055628015860:web:d45586507dcddd3d7786a1",
+            "windows": "1:1055628015860:web:7b0c051d23b798c07786a1"
+          }
+        }
+      }
+    }
+  }
+}

@@ -85,13 +85,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       ),
       builder: (ctx) => AddTransactionSheet(
         initialType: type,
-        onAdd: (transaction) {
+        firestoreService: _firestoreService,
+        authController: widget.authController,
+        onAdd: (transaction) async {
           setState(() {
             _transactions.removeWhere((t) => t.id == transaction.id);
             _transactions.insert(0, transaction);
           });
           final userId = widget.authController?.userId ?? 'guest_user';
-          _firestoreService.saveTransaction(userId, transaction);
+          try {
+            await _firestoreService.saveTransaction(userId, transaction);
+          } catch (e) {
+            debugPrint('Error saving transaction: $e');
+          }
         },
       ),
     );

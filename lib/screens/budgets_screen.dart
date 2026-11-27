@@ -2,16 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../controllers/auth_controller.dart';
+import '../models/budget_item.dart';
 import '../models/category_item.dart';
 import '../models/transaction_item.dart';
 import '../services/firestore_service.dart';
 
-class BudgetLimit {
-  final String category;
-  final double limit;
-
-  BudgetLimit({required this.category, required this.limit});
-}
+typedef BudgetLimit = BudgetItem;
 
 class CategoryBadgeData {
   String id;
@@ -157,6 +153,7 @@ class _BudgetsScreenState extends State<BudgetsScreen>
   final List<BudgetLimit> _budgets = [];
   late final FirestoreService _firestoreService;
   StreamSubscription<List<CategoryItem>>? _categoriesSub;
+  StreamSubscription<List<BudgetItem>>? _budgetsSub;
 
   final List<CategoryBadgeData> _expenseCategories = [];
   final List<CategoryBadgeData> _incomeCategories = [];
@@ -168,11 +165,13 @@ class _BudgetsScreenState extends State<BudgetsScreen>
     _firestoreService = widget.firestoreService ?? FirestoreService();
     _loadPredefinedCategories();
     _subscribeToCategories();
+    _subscribeToBudgets();
     widget.authController?.addListener(_onAuthChanged);
   }
 
   void _onAuthChanged() {
     _subscribeToCategories();
+    _subscribeToBudgets();
   }
 
   void _loadPredefinedCategories() {
@@ -208,6 +207,18 @@ class _BudgetsScreenState extends State<BudgetsScreen>
     });
   }
 
+  void _subscribeToBudgets() {
+    _budgetsSub?.cancel();
+    final userId = widget.authController?.userId ?? 'guest_user';
+    _budgetsSub = _firestoreService.streamBudgets(userId).listen((items) {
+      if (!mounted) return;
+      setState(() {
+        _budgets.clear();
+        _budgets.addAll(items);
+      });
+    });
+  }
+
   CategoryBadgeData _itemToBadge(CategoryItem item) {
     final bgColor = CategoryItem.hexToColor(item.colour);
     CategoryColorTheme? matchedTheme;
@@ -238,6 +249,7 @@ class _BudgetsScreenState extends State<BudgetsScreen>
   void dispose() {
     widget.authController?.removeListener(_onAuthChanged);
     _categoriesSub?.cancel();
+    _budgetsSub?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -259,12 +271,12 @@ class _BudgetsScreenState extends State<BudgetsScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
+        builder: (modalCtx, setModalState) => Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
             top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -349,14 +361,54 @@ class _BudgetsScreenState extends State<BudgetsScreen>
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {
-                  final amount = double.tryParse(amountController.text.trim());
-                  if (amount != null && amount > 0) {
+                onPressed: () async {
+                  final raw = amountController.text.trim();
+                  final amountNum = double.tryParse(raw);
+                  if (amountNum != null && amountNum > 0) {
+                    final int monthlyLimit = amountNum.round();
+                    final userId = widget.authController?.userId ?? 'guest_user';
+                    final safeCatId = selectedCat
+                        .replaceAll(RegExp(r'[^a-zA-Z0-9_]'), '_')
+                        .toLowerCase();
+                    final budgetId = 'budget_${userId}_$safeCatId';
+
+                    final budgetItem = BudgetItem(
+                      id: budgetId,
+                      categoryName: selectedCat,
+                      monthlyLimit: monthlyLimit,
+                      userId: userId,
+                    );
+
                     setState(() {
-                      _budgets.removeWhere((b) => b.category == selectedCat);
-                      _budgets.add(BudgetLimit(category: selectedCat, limit: amount));
+                      _budgets.removeWhere((b) => b.categoryName == selectedCat);
+                      _budgets.add(budgetItem);
                     });
+
                     Navigator.of(ctx).pop();
+
+                    try {
+                      await _firestoreService.saveBudget(budgetItem);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Budget set for $selectedCat: ₹ $monthlyLimit',
+                            ),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: Colors.red.shade700,
+                            content: Text('Failed to save budget to Firestore: $e'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    }
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -409,12 +461,12 @@ class _BudgetsScreenState extends State<BudgetsScreen>
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
+        builder: (modalCtx, setModalState) => Padding(
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
             top: 20,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom + 24,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -485,7 +537,7 @@ class _BudgetsScreenState extends State<BudgetsScreen>
                   scrollDirection: Axis.horizontal,
                   itemCount: kCategoryIcons.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
+                  itemBuilder: (_, index) {
                     final icon = kCategoryIcons[index];
                     final isSelected = selectedIcon == icon;
                     return InkWell(
@@ -526,7 +578,7 @@ class _BudgetsScreenState extends State<BudgetsScreen>
                   scrollDirection: Axis.horizontal,
                   itemCount: kCategoryColorThemes.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
+                  itemBuilder: (_, index) {
                     final theme = kCategoryColorThemes[index];
                     final isSelected = selectedTheme.label == theme.label;
                     return InkWell(
@@ -555,7 +607,7 @@ class _BudgetsScreenState extends State<BudgetsScreen>
 
               // Save Button
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   final name = nameController.text.trim();
                   if (name.isEmpty) return;
 
@@ -593,19 +645,34 @@ class _BudgetsScreenState extends State<BudgetsScreen>
                     userId: userId,
                     isPredefined: false,
                   );
-                  _firestoreService.saveCategory(categoryItem);
 
                   Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        isEditing
-                            ? 'Updated category: $name'
-                            : 'Added new category: $name',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
+
+                  try {
+                    await _firestoreService.saveCategory(categoryItem);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isEditing
+                                ? 'Updated category: $name'
+                                : 'Added new category: $name',
+                          ),
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          backgroundColor: Colors.red.shade700,
+                          content: Text('Failed to save category to Firestore: $e'),
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: actionButtonColor,
@@ -705,22 +772,36 @@ class _BudgetsScreenState extends State<BudgetsScreen>
             child: Text('Cancel', style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B))),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
               final item = list[index];
               setState(() {
                 list.removeAt(index);
               });
-              _firestoreService.deleteCategory(
-                item.id,
-                isExpense ? 'expense' : 'income',
-              );
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Deleted "${item.name}"'),
-                  duration: const Duration(seconds: 1),
-                ),
-              );
+              try {
+                await _firestoreService.deleteCategory(
+                  item.id,
+                  isExpense ? 'expense' : 'income',
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Deleted "${item.name}"'),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      backgroundColor: Colors.red.shade700,
+                      content: Text('Failed to delete category from Firestore: $e'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFDC2626),
@@ -890,7 +971,7 @@ class _BudgetsScreenState extends State<BudgetsScreen>
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
       itemCount: _budgets.length + 1,
       separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
+      itemBuilder: (_, index) {
         if (index == _budgets.length) {
           return Center(
             child: TextButton.icon(
@@ -950,8 +1031,36 @@ class _BudgetsScreenState extends State<BudgetsScreen>
                       size: 18,
                       color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      final budgetToDelete = _budgets[index];
+                      final userId = widget.authController?.userId ?? 'guest_user';
                       setState(() => _budgets.removeAt(index));
+                      try {
+                        await _firestoreService.deleteBudget(
+                          budgetToDelete.id,
+                          userId: userId,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Removed budget for "${budgetToDelete.categoryName}"',
+                              ),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.red.shade700,
+                              content: Text('Failed to delete budget: $e'),
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      }
                     },
                   ),
                 ],
